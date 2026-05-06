@@ -34,6 +34,9 @@ class RunConfig:
     denoise: bool = True
     deskew: bool = True
     min_line_length: int = 20
+    segment_merge_distance_px: float = 5.0
+    vector_collinear_merge_angle_deg: float = 5.0
+    vector_polyline_rdp_epsilon_px: float = 1.5
     link_mode: str = "hybrid"
     padding_px: float = 120.0
     max_nearest_px: float = 180.0
@@ -100,6 +103,9 @@ def run(cfg: RunConfig) -> RunResult:
     segs: list[Segment] = extract_segments(
         pre.gray,
         min_line_length=min_len,
+        merge_distance=cfg.segment_merge_distance_px,
+        collinear_merge_angle_deg=cfg.vector_collinear_merge_angle_deg,
+        polyline_rdp_epsilon_px=cfg.vector_polyline_rdp_epsilon_px,
     )
     if not segs:
         warnings.append("No line segments detected — try lowering min_line_length or tuning scan quality.")
@@ -210,6 +216,9 @@ def run(cfg: RunConfig) -> RunResult:
             "max_nearest_px": cfg.max_nearest_px,
             "skip_ocr": cfg.skip_ocr,
             "min_line_length": cfg.min_line_length,
+            "segment_merge_distance_px": cfg.segment_merge_distance_px,
+            "vector_collinear_merge_angle_deg": cfg.vector_collinear_merge_angle_deg,
+            "vector_polyline_rdp_epsilon_px": cfg.vector_polyline_rdp_epsilon_px,
         },
     }
 

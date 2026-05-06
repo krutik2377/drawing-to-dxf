@@ -16,6 +16,51 @@ def image_xy_to_dxf(x: float, y: float, img_height_px: float, scale: float) -> t
     return (x * scale, (img_height_px - y) * scale)
 
 
+def export_viewer_layout_dxf(
+    path: Path,
+    panels: list[tuple[str, PartGroup, float, float]],
+    *,
+    mm_per_pixel: float = 1.0,
+    gap_mm: float = 25.0,
+) -> None:
+    """
+    Single DXF for web viewers: each panel on its own layer, laid out along +X with gaps.
+
+    Autodesk Viewer (online) expects one primary CAD file per session; upload this file alone.
+    Do not upload *_manifest.json with it.
+    """
+    doc = ezdxf.new(setup=True)
+    doc.units = units.MM
+    msp = doc.modelspace()
+
+    offset_x = 0.0
+    for layer_base, group, crop_h, crop_w in panels:
+        layer_base = layer_base[:255]
+        lbl_layer = f"{layer_base}_LBL"[:255]
+        doc.layers.add(layer_base, color=7)
+        doc.layers.add(lbl_layer, color=3)
+
+        for s in group.segments:
+            x1, y1 = image_xy_to_dxf(s.x1, s.y1, crop_h, mm_per_pixel)
+            x2, y2 = image_xy_to_dxf(s.x2, s.y2, crop_h, mm_per_pixel)
+            msp.add_line((x1 + offset_x, y1), (x2 + offset_x, y2), dxfattribs={"layer": layer_base})
+
+        cx, cy = image_xy_to_dxf(
+            group.label_center[0], group.label_center[1], crop_h, mm_per_pixel
+        )
+        hgt = max(2.5, 12.0 * mm_per_pixel)
+        msp.add_text(
+            f"PART {group.part_id}",
+            dxfattribs={"height": hgt, "layer": lbl_layer, "insert": (cx + offset_x, cy)},
+        )
+
+        width_mm = float(crop_w) * mm_per_pixel
+        offset_x += width_mm + gap_mm
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc.saveas(str(path))
+
+
 def export_part_dxf(
     path: Path,
     part: PartGroup,

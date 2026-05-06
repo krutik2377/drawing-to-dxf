@@ -4,6 +4,8 @@ Turn **raster or PDF engineering sheets** into **AutoCAD-compatible DXF** files:
 
 **AutoCAD is not required** to generate DXF. Open outputs in AutoCAD, BricsCAD, LibreCAD, or any tool that reads DXF.
 
+**Clean, install, and run (interview checklist):** [docs/CLEAN_AND_RUN.md](docs/CLEAN_AND_RUN.md)
+
 ---
 
 ## What this project does (and does not do)
@@ -53,6 +55,34 @@ pytest -q
 ## Usage
 
 ```bash
+drawing-to-dxf sheet path\to\shop_parts.png -o out_sheet --ai ollama
+```
+
+**Sheet workflow** (`sheet` subcommand):
+
+1. Preprocess and **split** the page into panel crops (`panel_split`).
+2. **EasyOCR** builds a text context string per panel (requires `pip install -e ".[ocr]"`).
+3. Optional **vision model** returns **structured JSON** per panel:
+   - `--ai none` — titles from OCR only; no network.
+   - `--ai ollama` — **free locally** (e.g. [Ollama](https://ollama.com/) + `llava` / a vision model). Set `--ollama-model`.
+   - `--ai openai` — OpenAI-compatible **paid** API; needs `OPENAI_API_KEY` (or Azure base URL). **This is not DALL·E** — it is chat/vision for JSON extraction.
+4. Writes **`<stem>_composite_layout.png`**: a **grid of the real panel crops** + titles (Pillow). This matches your sample **layout class** (many details on one sheet) without using generative “draw a drawing” APIs.
+
+Outputs: `*_sheet_manifest.json`, `*_panel_XX.png`, `*_composite_layout.png`.
+
+### DALL·E / “free image generation” (important)
+
+- **OpenAI DALL·E via API is paid** (per image; there is no durable free API tier for production use). Consumer/UI promos can differ — do not rely on them for automation.
+- **For shop drawings, avoid generative image models anyway:** they are not trustworthy for **true dimensions**, hole grids, or standards compliance.
+- **Recommended “free” AI paths here:** run a **vision LLM locally** (Ollama + llava/mistral-small3.1-vision etc.) for **understanding + JSON**, and build the final sheet by **compositing** crops or redrawing vectors (this repo’s `sheet` path uses compositing).
+
+Other free/community options (subject to change): local Stable Diffusion for textures **not** for fabrication drawings; some Hugging Face inference endpoints with rate limits — still inappropriate for metrology-heavy output.
+
+---
+
+## Usage (DXF pipeline)
+
+```bash
 drawing-to-dxf path\to\sheet.png -o out
 ```
 
@@ -92,7 +122,19 @@ Each run writes:
 
 ---
 
-## Architecture
+## Architecture: `sheet` workflow
+
+```text
+Input (multi-part shop sheet)
+    → preprocess + split panels
+    → OCR excerpt per panel
+    → [optional] vision LLM → JSON
+    → composite PNG (grid) + manifest
+```
+
+---
+
+## Architecture (DXF pipeline)
 
 ```text
 Input (image/PDF)
