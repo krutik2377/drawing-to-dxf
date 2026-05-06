@@ -1,0 +1,10 @@
+opencv-python-headless<5.0.0,>=4.8.0
+numpy<3.0.0,>=1.24.0
+ezdxf<2.0.0,>=1.1.0
+pymupdf<2.0.0,>=1.23.0
+
+[dev]
+pytest<9.0.0,>=7.4.0
+
+[ocr]
+easyocr>=1.7.0

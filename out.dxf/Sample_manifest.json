@@ -1,0 +1,503 @@
+{
+  "version": 1,
+  "input": "C:\\Users\\admin\\Desktop\\HyzenInterview\\Resource\\Sample.png",
+  "processed_size_px": {
+    "width": 1476,
+    "height": 1205
+  },
+  "original_raster_shape": {
+    "height": 1205,
+    "width": 1476
+  },
+  "preprocess_scale_from_original": 1.0,
+  "mm_per_pixel": 1.0,
+  "segment_count": 4170,
+  "ocr_text_boxes": 215,
+  "parts": [
+    {
+      "part_id": "139",
+      "segment_count": 38,
+      "label_xy_px": {
+        "x": 1424.0,
+        "y": 6.5
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_139.dxf"
+    },
+    {
+      "part_id": "7446",
+      "segment_count": 42,
+      "label_xy_px": {
+        "x": 468.0,
+        "y": 15.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_7446.dxf"
+    },
+    {
+      "part_id": "713",
+      "segment_count": 19,
+      "label_xy_px": {
+        "x": 1322.0,
+        "y": 17.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_713.dxf"
+    },
+    {
+      "part_id": "730",
+      "segment_count": 155,
+      "label_xy_px": {
+        "x": 134.0,
+        "y": 55.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_730.dxf"
+    },
+    {
+      "part_id": "733",
+      "segment_count": 20,
+      "label_xy_px": {
+        "x": 281.0,
+        "y": 48.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_733.dxf"
+    },
+    {
+      "part_id": "741",
+      "segment_count": 51,
+      "label_xy_px": {
+        "x": 1205.0,
+        "y": 55.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_741.dxf"
+    },
+    {
+      "part_id": "732",
+      "segment_count": 36,
+      "label_xy_px": {
+        "x": 278.0,
+        "y": 85.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_732.dxf"
+    },
+    {
+      "part_id": "729",
+      "segment_count": 44,
+      "label_xy_px": {
+        "x": 298.0,
+        "y": 113.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_729.dxf"
+    },
+    {
+      "part_id": "345",
+      "segment_count": 62,
+      "label_xy_px": {
+        "x": 344.0,
+        "y": 180.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_345.dxf"
+    },
+    {
+      "part_id": "737",
+      "segment_count": 8,
+      "label_xy_px": {
+        "x": 380.0,
+        "y": 178.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_737.dxf"
+    },
+    {
+      "part_id": "703",
+      "segment_count": 52,
+      "label_xy_px": {
+        "x": 252.0,
+        "y": 195.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_703.dxf"
+    },
+    {
+      "part_id": "620",
+      "segment_count": 237,
+      "label_xy_px": {
+        "x": 834.0,
+        "y": 202.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_620.dxf"
+    },
+    {
+      "part_id": "742",
+      "segment_count": 39,
+      "label_xy_px": {
+        "x": 1347.0,
+        "y": 233.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_742.dxf"
+    },
+    {
+      "part_id": "101",
+      "segment_count": 101,
+      "label_xy_px": {
+        "x": 235.0,
+        "y": 253.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_101.dxf"
+    },
+    {
+      "part_id": "702",
+      "segment_count": 140,
+      "label_xy_px": {
+        "x": 731.0,
+        "y": 270.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_702.dxf"
+    },
+    {
+      "part_id": "740",
+      "segment_count": 174,
+      "label_xy_px": {
+        "x": 498.0,
+        "y": 286.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_740.dxf"
+    },
+    {
+      "part_id": "20160",
+      "segment_count": 22,
+      "label_xy_px": {
+        "x": 555.0,
+        "y": 310.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_20160.dxf"
+    },
+    {
+      "part_id": "150",
+      "segment_count": 52,
+      "label_xy_px": {
+        "x": 281.0,
+        "y": 330.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_150.dxf"
+    },
+    {
+      "part_id": "739",
+      "segment_count": 73,
+      "label_xy_px": {
+        "x": 1218.0,
+        "y": 368.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_739.dxf"
+    },
+    {
+      "part_id": "104",
+      "segment_count": 115,
+      "label_xy_px": {
+        "x": 702.0,
+        "y": 388.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_104.dxf"
+    },
+    {
+      "part_id": "712",
+      "segment_count": 202,
+      "label_xy_px": {
+        "x": 240.0,
+        "y": 452.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_712.dxf"
+    },
+    {
+      "part_id": "711",
+      "segment_count": 99,
+      "label_xy_px": {
+        "x": 725.0,
+        "y": 449.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_711.dxf"
+    },
+    {
+      "part_id": "735",
+      "segment_count": 35,
+      "label_xy_px": {
+        "x": 402.0,
+        "y": 497.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_735.dxf"
+    },
+    {
+      "part_id": "743",
+      "segment_count": 38,
+      "label_xy_px": {
+        "x": 1347.0,
+        "y": 494.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_743.dxf"
+    },
+    {
+      "part_id": "409",
+      "segment_count": 69,
+      "label_xy_px": {
+        "x": 244.0,
+        "y": 504.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_409.dxf"
+    },
+    {
+      "part_id": "701",
+      "segment_count": 140,
+      "label_xy_px": {
+        "x": 39.0,
+        "y": 529.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_701.dxf"
+    },
+    {
+      "part_id": "403",
+      "segment_count": 10,
+      "label_xy_px": {
+        "x": 259.0,
+        "y": 520.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_403.dxf"
+    },
+    {
+      "part_id": "709",
+      "segment_count": 68,
+      "label_xy_px": {
+        "x": 166.0,
+        "y": 577.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_709.dxf"
+    },
+    {
+      "part_id": "24159",
+      "segment_count": 3,
+      "label_xy_px": {
+        "x": 278.0,
+        "y": 578.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_24159.dxf"
+    },
+    {
+      "part_id": "475",
+      "segment_count": 24,
+      "label_xy_px": {
+        "x": 134.0,
+        "y": 603.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_475.dxf"
+    },
+    {
+      "part_id": "736",
+      "segment_count": 10,
+      "label_xy_px": {
+        "x": 294.0,
+        "y": 601.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_736.dxf"
+    },
+    {
+      "part_id": "707",
+      "segment_count": 211,
+      "label_xy_px": {
+        "x": 930.0,
+        "y": 608.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_707.dxf"
+    },
+    {
+      "part_id": "7574",
+      "segment_count": 11,
+      "label_xy_px": {
+        "x": 14.0,
+        "y": 629.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_7574.dxf"
+    },
+    {
+      "part_id": "9876",
+      "segment_count": 56,
+      "label_xy_px": {
+        "x": 469.0,
+        "y": 640.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_9876.dxf"
+    },
+    {
+      "part_id": "731",
+      "segment_count": 50,
+      "label_xy_px": {
+        "x": 938.0,
+        "y": 646.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_731.dxf"
+    },
+    {
+      "part_id": "738",
+      "segment_count": 34,
+      "label_xy_px": {
+        "x": 206.0,
+        "y": 661.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_738.dxf"
+    },
+    {
+      "part_id": "720",
+      "segment_count": 20,
+      "label_xy_px": {
+        "x": 449.0,
+        "y": 672.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_720.dxf"
+    },
+    {
+      "part_id": "714",
+      "segment_count": 0,
+      "label_xy_px": {
+        "x": 297.0,
+        "y": 682.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_714.dxf"
+    },
+    {
+      "part_id": "715",
+      "segment_count": 103,
+      "label_xy_px": {
+        "x": 673.0,
+        "y": 679.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_715.dxf"
+    },
+    {
+      "part_id": "734",
+      "segment_count": 8,
+      "label_xy_px": {
+        "x": 175.0,
+        "y": 728.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_734.dxf"
+    },
+    {
+      "part_id": "10296",
+      "segment_count": 26,
+      "label_xy_px": {
+        "x": 468.0,
+        "y": 747.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_10296.dxf"
+    },
+    {
+      "part_id": "722",
+      "segment_count": 12,
+      "label_xy_px": {
+        "x": 37.0,
+        "y": 759.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_722.dxf"
+    },
+    {
+      "part_id": "721",
+      "segment_count": 0,
+      "label_xy_px": {
+        "x": 153.0,
+        "y": 764.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_721.dxf"
+    },
+    {
+      "part_id": "515",
+      "segment_count": 98,
+      "label_xy_px": {
+        "x": 496.0,
+        "y": 882.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_515.dxf"
+    },
+    {
+      "part_id": "131",
+      "segment_count": 140,
+      "label_xy_px": {
+        "x": 130.0,
+        "y": 970.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_131.dxf"
+    },
+    {
+      "part_id": "128",
+      "segment_count": 0,
+      "label_xy_px": {
+        "x": 99.0,
+        "y": 1027.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_128.dxf"
+    },
+    {
+      "part_id": "863",
+      "segment_count": 0,
+      "label_xy_px": {
+        "x": 226.0,
+        "y": 522.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_863.dxf"
+    }
+  ],
+  "outputs": {
+    "assembly_layers_dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_assembly_layers.dxf",
+    "per_part": {
+      "139": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_139.dxf",
+      "7446": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_7446.dxf",
+      "713": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_713.dxf",
+      "730": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_730.dxf",
+      "733": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_733.dxf",
+      "741": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_741.dxf",
+      "732": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_732.dxf",
+      "729": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_729.dxf",
+      "345": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_345.dxf",
+      "737": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_737.dxf",
+      "703": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_703.dxf",
+      "620": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_620.dxf",
+      "742": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_742.dxf",
+      "101": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_101.dxf",
+      "702": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_702.dxf",
+      "740": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_740.dxf",
+      "20160": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_20160.dxf",
+      "150": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_150.dxf",
+      "739": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_739.dxf",
+      "104": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_104.dxf",
+      "712": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_712.dxf",
+      "711": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_711.dxf",
+      "735": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_735.dxf",
+      "743": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_743.dxf",
+      "409": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_409.dxf",
+      "701": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_701.dxf",
+      "403": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_403.dxf",
+      "709": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_709.dxf",
+      "24159": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_24159.dxf",
+      "475": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_475.dxf",
+      "736": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_736.dxf",
+      "707": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_707.dxf",
+      "7574": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_7574.dxf",
+      "9876": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_9876.dxf",
+      "731": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_731.dxf",
+      "738": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_738.dxf",
+      "720": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_720.dxf",
+      "714": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_714.dxf",
+      "715": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_715.dxf",
+      "734": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_734.dxf",
+      "10296": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_10296.dxf",
+      "722": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_722.dxf",
+      "721": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_721.dxf",
+      "515": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_515.dxf",
+      "131": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_131.dxf",
+      "128": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_128.dxf",
+      "863": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out.dxf\\Sample_part_863.dxf"
+    }
+  },
+  "warnings": [
+    "Some matched part IDs have no linked geometry: 714, 721, 128, 863"
+  ],
+  "parameters": {
+    "link_mode": "hybrid",
+    "padding_px": 120.0,
+    "max_nearest_px": 180.0,
+    "skip_ocr": false,
+    "min_line_length": 20
+  }
+}

@@ -1,0 +1,141 @@
+# drawing-to-dxf
+
+Turn **raster or PDF engineering sheets** into **AutoCAD-compatible DXF** files: full-sheet vectorization plus an **optional heuristic split** into per-part drawings using **OCR** for stamped part numbers (for example `701`, `1024`).
+
+**AutoCAD is not required** to generate DXF. Open outputs in AutoCAD, BricsCAD, LibreCAD, or any tool that reads DXF.
+
+---
+
+## What this project does (and does not do)
+
+| In scope | Out of scope |
+|----------|----------------|
+| Load PNG/JPG/TIFF/BMP or PDF (first page, configurable) | Guaranteed shop-ready dimensions without calibration or human review |
+| Denoise, optional mild deskew, safe downscale of huge scans | Perfect extraction from very dense lattice / hand-redlined drawings |
+| Line vectorization (Canny + Hough) | True 3D reconstruction or full multi-view reasoning |
+| Optional **EasyOCR** (en/de) + regex part IDs → **per-part DXF** | Legal/certified “as-built” drawings |
+
+Treat outputs as **draft geometry**: calibrate scale (`--mm-per-pixel`), tune linking parameters, and review in CAD before manufacturing.
+
+---
+
+## Install
+
+**Python 3.10+** recommended.
+
+### Core only (vectorize to DXF, no per-part OCR)
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux/macOS
+
+pip install -e .
+```
+
+Or: `pip install -r requirements.txt` (core dependencies only; then `pip install -e .` if you use the CLI package).
+
+### With OCR (per-part split; pulls PyTorch / models on first run)
+
+```bash
+pip install -e ".[ocr]"
+```
+
+### Developers
+
+```bash
+pip install -e ".[ocr,dev]"
+pytest -q
+```
+
+---
+
+## Usage
+
+```bash
+drawing-to-dxf path\to\sheet.png -o out
+```
+
+**PDF:**
+
+```bash
+drawing-to-dxf drawing.pdf --pdf-page 0 --pdf-dpi 200 -o out
+```
+
+**Vectorize only** (no OCR / no EasyOCR install):
+
+```bash
+drawing-to-dxf sheet.png --skip-ocr -o out
+```
+
+### Useful flags
+
+| Flag | Meaning |
+|------|---------|
+| `-o`, `--output-dir` | Output folder (default `./out`) |
+| `--mm-per-pixel` | Drawing scale: mm per **processed** pixel (default `1.0`) |
+| `--max-side` | Downscale longest edge (default `4096`; `0` = disable) |
+| `--skip-ocr` | Single DXF with all detected lines |
+| `--ocr-gpu` | EasyOCR with GPU if available |
+| `--link-mode hybrid\|bbox\|nearest` | How lines attach to part labels |
+| `--padding-px` | Grow OCR box for `bbox` / hybrid assignment |
+| `--max-nearest-px` | Max distance for nearest-neighbor assignment |
+| `--part-regex` | Custom regex for part numbers (default: 3–5 digits) |
+| `--min-line-length` | Shortest Hough segment (pixels, after preprocess) |
+| `--no-denoise` / `--no-deskew` | Disable preprocessing steps |
+
+Each run writes:
+
+- `<stem>_manifest.json` — sizes, counts, paths, warnings  
+- `<stem>_assembly_layers.dxf` — merged file (either all lines on one layer, or layers per part + `UNASSIGNED`)  
+- `<stem>_part_<id>.dxf` — one file per detected part when splitting succeeds  
+
+---
+
+## Architecture
+
+```text
+Input (image/PDF)
+    → preprocess (gray, denoise, deskew, optional resize)
+    → vectorize (segments)
+    → [optional] OCR (text boxes)
+    → [optional] filter part IDs (regex) + link segments (bbox / nearest / hybrid)
+    → export DXF (ezdxf) + manifest JSON
+```
+
+- **Coordinate system:** Image origin top-left; DXF uses **Y up** (flipped from image). Units are **millimeters** in DXF with length = pixel × `--mm-per-pixel` on the **processed** raster.
+
+---
+
+## Edge cases handled in code
+
+- **Unicode paths on Windows:** image read uses `np.fromfile` + `cv2.imdecode`.
+- **Oversized rasters:** `--max-side` avoids memory blowups; manifest records scale vs original.
+- **OCR missing or failed:** falls back to full-sheet vector DXF with a warning.
+- **No lines detected:** empty/minimal DXF + manifest warning.
+- **OCR but no regex matches:** single vector DXF; suggests tuning `--part-regex`.
+- **Duplicate part IDs from OCR:** one label box kept per ID for linking.
+- **PDF page out of range:** clear `FileNotFoundError` from loader.
+
+---
+
+## Limitations (expect tuning)
+
+- **Linking is heuristic:** overlapping callouts, long members, and shared lines can be assigned to the wrong part or `UNASSIGNED`.
+- **Vectorization:** dashed lines, thick ink, and scanning noise fragment or duplicate geometry.
+- **Scale:** default `1 mm` per pixel is arbitrary; set `--mm-per-pixel` from a known dimension on the sheet.
+- **First EasyOCR run:** downloads models; can be slow and large.
+
+---
+
+## Interview / demo narrative
+
+1. **Problem:** raster/PDF → structured CAD for downstream part detailing.  
+2. **Approach:** classical CV for primitives + OCR for labels + **explicit intermediate representation** (segments + manifest) before DXF.  
+3. **Production:** add human review UI, CAD templates, and better association (graph / learning) between leaders and geometry.
+
+---
+
+## License
+
+Use and modify for your interview or internal work; add a license file if you redistribute.

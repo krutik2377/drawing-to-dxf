@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drawing-to-dxf"
+version = "0.1.0"
+description = "Raster/PDF engineering drawing → per-part DXF (OpenCV + ezdxf; optional EasyOCR)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python-headless>=4.8.0,<5.0.0",
+    "numpy>=1.24.0,<3.0.0",
+    "ezdxf>=1.1.0,<2.0.0",
+    "pymupdf>=1.23.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+ocr = ["easyocr>=1.7.0"]
+dev = ["pytest>=7.4.0,<9.0.0"]
+
+[project.scripts]
+drawing-to-dxf = "drawing_to_dxf.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

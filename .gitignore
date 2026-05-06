@@ -1,0 +1,21 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Outputs
+out/
+
+# OS
+.DS_Store
+Thumbs.db

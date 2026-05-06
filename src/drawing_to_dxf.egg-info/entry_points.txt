@@ -1,0 +1,2 @@
+[console_scripts]
+drawing-to-dxf = drawing_to_dxf.cli:main
