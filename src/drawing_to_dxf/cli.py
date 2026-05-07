@@ -19,7 +19,7 @@ def _sheet_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--pdf-page", type=int, default=0)
     p.add_argument("--pdf-dpi", type=float, default=150.0)
     p.add_argument("--max-side", type=int, default=4096)
-    p.add_argument("--panel-min-area", type=int, default=15_000, help="Min panel area (px²) after preprocess")
+    p.add_argument("--panel-min-area", type=int, default=15_000, help="Min panel area (px^2) after preprocess")
     p.add_argument("--panel-min-gap", type=int, default=48, help="Min white gutter width for gap splitter")
     p.add_argument("--ocr-gpu", action="store_true")
     p.add_argument(
@@ -46,7 +46,10 @@ def _sheet_args(p: argparse.ArgumentParser) -> None:
 
 
 def sheet_main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Split multi-part shop sheet → panels + optional AI JSON + composite PNG.")
+    p = argparse.ArgumentParser(
+        description="Split multi-part shop sheet to panels + optional AI JSON + composite PNG.",
+        fromfile_prefix_chars="@",
+    )
     _sheet_args(p)
     args = p.parse_args(argv)
     inp = args.input
@@ -88,6 +91,9 @@ def panels_main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description="Split sheet into gutter-separated panels; write one DXF per panel "
         "(vectorize inside each crop; optional OCR filenames). Safer than full-page part linking.",
+        fromfile_prefix_chars="@",
+        epilog="Save repeated flags in a UTF-8 text file (one argument per line), then:  "
+        "drawing-to-dxf panels @my_panels.args path/to/sheet.png",
     )
     p.add_argument("input", type=Path, help="PNG/JPG/TIFF/BMP or PDF shop sheet")
     p.add_argument("-o", "--output-dir", type=Path, default=Path("out_panels"))
@@ -115,7 +121,7 @@ def panels_main(argv: list[str] | None = None) -> int:
         "--segment-merge-distance",
         type=float,
         default=5.0,
-        help="pixels: merge nearby Hough endpoints for cleaner DXF lines (0 disables)",
+        help="pixels: snap nearby segment endpoints after exploding skeleton polylines (0 disables)",
     )
     p.add_argument(
         "--vector-collinear-angle-deg",
@@ -127,7 +133,7 @@ def panels_main(argv: list[str] | None = None) -> int:
         "--vector-rdp-epsilon",
         type=float,
         default=1.5,
-        help="Douglas–Peucker epsilon along degree-2 chains (px); 0 disables",
+        help="Douglas-Peucker epsilon along degree-2 chains (px); 0 disables",
     )
     p.add_argument("--mm-per-pixel", type=float, default=1.0)
     p.add_argument(
@@ -155,6 +161,91 @@ def panels_main(argv: list[str] | None = None) -> int:
         help="Override default part-number regex (requires EasyOCR unless --skip-ocr)",
     )
     p.add_argument("--ocr-min-confidence", type=float, default=0.15)
+    p.add_argument(
+        "--no-panel-gap-fallback",
+        action="store_true",
+        help="Disable XY gutter/grid splitting fallback when ink appears as one large blob",
+    )
+    p.add_argument(
+        "--no-mask-ocr-crops",
+        action="store_true",
+        help="Do not inpaint OCR text inside each cropped panel prior to skeleton tracing",
+    )
+    p.add_argument(
+        "--panel-split",
+        choices=("auto", "blob", "geometry_cc"),
+        default="auto",
+        help="Panel detection: contour/blob (legacy), geometry connected-components, or auto pick",
+    )
+    p.add_argument(
+        "--trace-debug-dir",
+        type=Path,
+        default=None,
+        help="Write per-panel PNG stages under this folder (original, masked, binary, skeleton, overlay)",
+    )
+    p.add_argument(
+        "--full-rect-ocr-mask",
+        action="store_true",
+        help="Erase full OCR rectangles in each crop; default wipes text interiors only",
+    )
+    p.add_argument(
+        "--no-soft-ink",
+        action="store_true",
+        help="Aggressive ruling-line suppression on adaptive ink mask",
+    )
+    p.add_argument(
+        "--no-topology-clean",
+        action="store_true",
+        help="Skip HV snap / collinear merge on lwpolylines",
+    )
+    p.add_argument(
+        "--no-arc-fit",
+        action="store_true",
+        help="Disable arc + circular-loop to CIRCLE fitting",
+    )
+    p.add_argument(
+        "--skeleton-circles",
+        action="store_true",
+        help="Enable Hough circle pre-pass per panel (off by default on line art)",
+    )
+    p.add_argument(
+        "--no-skeleton-circles",
+        action="store_true",
+        help="Force-disable Hough circles on panel crops",
+    )
+    p.add_argument(
+        "--keep-title-corner-block",
+        action="store_true",
+        help="Keep bottom-right title-like blobs when using geometry_cc mode",
+    )
+    p.add_argument(
+        "--vectorize-lsd-supplement",
+        action="store_true",
+        help="After skeleton tracing, add OpenCV Line Segment Detector strokes not already covered",
+    )
+    p.add_argument(
+        "--vectorize-lsd-min-length",
+        type=float,
+        default=None,
+        help="Min LSD segment length in pixels (default: follow --min-line-length)",
+    )
+    p.add_argument(
+        "--geometry-bridge-gap",
+        type=float,
+        default=0.0,
+        help="Bridge open polyline endpoints facing each other within this gap (pixels); 0 disables",
+    )
+    p.add_argument(
+        "--no-dedupe-geometry-residuals",
+        action="store_true",
+        help="Keep redundant overlapping LINE residuals (LSD/double edges)",
+    )
+    p.add_argument(
+        "--raster-dpi",
+        type=float,
+        default=None,
+        help="Nominal raster DPI for scaling length thresholds vs 150dpi baseline (default: --pdf-dpi on PDF, else 150)",
+    )
 
     args = p.parse_args(argv)
     inp = args.input
@@ -176,9 +267,19 @@ def panels_main(argv: list[str] | None = None) -> int:
         panel_min_gap=args.panel_min_gap,
         panel_min_short_side_px=args.panel_min_short_side,
         panel_max_aspect_ratio=args.panel_max_aspect,
+        panel_gap_split_fallback=not args.no_panel_gap_fallback,
+        panel_split_strategy=args.panel_split,
+        exclude_corner_title_block=not args.keep_title_corner_block,
         segment_merge_distance_px=args.segment_merge_distance,
         vector_collinear_merge_angle_deg=args.vector_collinear_angle_deg,
         vector_polyline_rdp_epsilon_px=args.vector_rdp_epsilon,
+        mask_annotation_via_ocr_crop=not args.no_mask_ocr_crops,
+        mask_text_interior_only=not args.full_rect_ocr_mask,
+        soft_ink_mask=not args.no_soft_ink,
+        enable_topology_clean=not args.no_topology_clean,
+        enable_arc_fitting=not args.no_arc_fit,
+        enable_loop_circle_fit=not args.no_arc_fit,
+        trace_debug_dir=args.trace_debug_dir,
         skip_ocr=args.skip_ocr,
         ocr_gpu=args.ocr_gpu,
         part_regex=args.part_regex,
@@ -187,6 +288,12 @@ def panels_main(argv: list[str] | None = None) -> int:
         write_viewer_bundle=not args.no_viewer_bundle,
         viewer_layout_gap_mm=args.viewer_layout_gap_mm,
         emit_root_panel_dxfs=args.emit_root_panel_dxfs,
+        enable_skeleton_circles=args.skeleton_circles and not args.no_skeleton_circles,
+        vectorize_lsd_supplement=args.vectorize_lsd_supplement,
+        vectorize_lsd_min_length_px=args.vectorize_lsd_min_length,
+        geometry_bridge_gap_px=args.geometry_bridge_gap,
+        dedupe_geometry_residuals=not args.no_dedupe_geometry_residuals,
+        raster_dpi_nominal=args.raster_dpi,
     )
     try:
         res = run_panel_dxfs(cfg)
@@ -205,8 +312,9 @@ def panels_main(argv: list[str] | None = None) -> int:
 
 def convert_main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
-        description="Convert raster/PDF sheets to DXF. Subcommands: `sheet …`, "
-        "`panels …`, `ui-panels` (Streamlit preview).",
+        description="Convert raster/PDF sheets to DXF. Subcommands: `sheet ...`, "
+        "`panels ...`, `ui-panels` (Streamlit preview).",
+        fromfile_prefix_chars="@",
     )
     p.add_argument("input", type=Path, help="Path to PNG/JPG/TIFF/BMP or PDF")
     p.add_argument(
@@ -226,7 +334,12 @@ def convert_main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--no-denoise", action="store_true")
     p.add_argument("--no-deskew", action="store_true")
-    p.add_argument("--min-line-length", type=int, default=20, help="Hough min line length (pixels, processed)")
+    p.add_argument(
+        "--min-line-length",
+        type=int,
+        default=20,
+        help="Skeleton branch / legacy Hough min span (pixels, processed image)",
+    )
     p.add_argument(
         "--segment-merge-distance",
         type=float,
@@ -243,7 +356,7 @@ def convert_main(argv: list[str] | None = None) -> int:
         "--vector-rdp-epsilon",
         type=float,
         default=1.5,
-        help="Douglas–Peucker simplify polylines (image px); 0 disables",
+        help="Douglas-Peucker simplify polylines (image px); 0 disables",
     )
     p.add_argument(
         "--link-mode",
@@ -273,6 +386,85 @@ def convert_main(argv: list[str] | None = None) -> int:
         help=r'Override part-number regex (default: \b\d{3,5}\b style)',
     )
     p.add_argument("--ocr-min-confidence", type=float, default=0.15)
+    p.add_argument(
+        "--full-rect-ocr-mask",
+        action="store_true",
+        help="Erase full OCR rectangles before tracing (legacy); default clears text interiors only",
+    )
+    p.add_argument(
+        "--no-soft-ink",
+        action="store_true",
+        help="Apply aggressive horizontal ruling suppression on adaptive ink mask",
+    )
+    p.add_argument(
+        "--no-topology-clean",
+        action="store_true",
+        help="Skip orthogonal/collinear tidy pass on traced lwpolylines",
+    )
+    p.add_argument(
+        "--no-arc-fit",
+        action="store_true",
+        help="Disable arc approximation and circular loop to CIRCLE substitution",
+    )
+    p.add_argument(
+        "--no-mask-annotations",
+        action="store_true",
+        help="Skip inpainting OCR text boxes before skeleton tracing",
+    )
+    p.add_argument(
+        "--skeleton-circles",
+        action="store_true",
+        help="Enable Hough circles + hole validation (off by default; noisy on line-only drawings)",
+    )
+    p.add_argument(
+        "--no-skeleton-circles",
+        action="store_true",
+        help="Force-disable Hough circles if enabled elsewhere",
+    )
+    p.add_argument(
+        "--skeleton-text-pad-pixels",
+        type=float,
+        default=10.0,
+        help="Expand OCR rectangles before wiping text strokes ahead of skeletonization",
+    )
+    p.add_argument(
+        "--legacy-hough-vectorize",
+        action="store_true",
+        help="Use Canny + HoughLinesP instead of OCR-masked skeleton graphs",
+    )
+    p.add_argument(
+        "--vectorize-lsd-supplement",
+        action="store_true",
+        help="Add OpenCV LSD segments that the skeleton path may miss",
+    )
+    p.add_argument(
+        "--vectorize-lsd-min-length",
+        type=float,
+        default=None,
+        help="Min LSD stroke in pixels (default: similar to --min-line-length)",
+    )
+    p.add_argument(
+        "--geometry-bridge-gap",
+        type=float,
+        default=0.0,
+        help="Bridge open polyline endpoints within this gap (px); 0 disables",
+    )
+    p.add_argument(
+        "--no-dedupe-geometry-residuals",
+        action="store_true",
+        help="Keep overlapping duplicate residual segments",
+    )
+    p.add_argument(
+        "--raster-dpi",
+        type=float,
+        default=None,
+        help="Scale thresholds vs 150dpi (default: --pdf-dpi for PDF else 150)",
+    )
+    p.add_argument(
+        "--profile-pipeline",
+        action="store_true",
+        help="Write preprocess/OCR/vectorize/export timings to manifest",
+    )
 
     args = p.parse_args(argv)
 
@@ -302,9 +494,24 @@ def convert_main(argv: list[str] | None = None) -> int:
         max_nearest_px=args.max_nearest_px,
         mm_per_pixel=args.mm_per_pixel,
         skip_ocr=args.skip_ocr,
+        mask_annotation_via_ocr=not args.no_mask_annotations,
+        enable_skeleton_circles=args.skeleton_circles and not args.no_skeleton_circles,
+        skeleton_annotation_pad_px=args.skeleton_text_pad_pixels,
+        legacy_vectorize_hough=args.legacy_hough_vectorize,
+        mask_text_interior_only=not args.full_rect_ocr_mask,
+        soft_ink_mask=not args.no_soft_ink,
+        enable_topology_clean=not args.no_topology_clean,
+        enable_arc_fitting=not args.no_arc_fit,
+        enable_loop_circle_fit=not args.no_arc_fit,
         ocr_gpu=args.ocr_gpu,
         part_regex=args.part_regex,
         ocr_min_confidence=args.ocr_min_confidence,
+        vectorize_lsd_supplement=args.vectorize_lsd_supplement,
+        vectorize_lsd_min_length_px=args.vectorize_lsd_min_length,
+        geometry_bridge_gap_px=args.geometry_bridge_gap,
+        dedupe_geometry_residuals=not args.no_dedupe_geometry_residuals,
+        raster_dpi_nominal=args.raster_dpi,
+        profile_pipeline=args.profile_pipeline,
     )
 
     try:
@@ -317,8 +524,11 @@ def convert_main(argv: list[str] | None = None) -> int:
     if res.part_ids:
         print(f"Parts: {', '.join(res.part_ids)}")
     else:
-        print("Parts: (none — see manifest warnings)")
-    print(f"Segments: {res.segment_count}, OCR boxes: {res.ocr_box_count}")
+        print("Parts: (none - see manifest warnings)")
+    print(
+        f"Segments: {res.segment_count}, primitives: {res.primitive_count}, "
+        f"OCR boxes: {res.ocr_box_count}"
+    )
     for w in res.warnings:
         print(f"Warning: {w}", file=sys.stderr)
     return 0

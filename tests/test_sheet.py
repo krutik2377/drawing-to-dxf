@@ -1,7 +1,15 @@
 import numpy as np
 
-from drawing_to_dxf.panel_split import split_panels
+from drawing_to_dxf.panel_split import split_panels, split_panels_geometry_cc
 from drawing_to_dxf.render_layout import PanelTile, render_composite_png
+
+
+def test_split_panels_geometry_cc_finds_two_regions() -> None:
+    g = np.full((400, 700), 255, dtype=np.uint8)
+    g[40:220, 40:260] = 30
+    g[40:220, 420:640] = 30
+    boxes = split_panels_geometry_cc(g, min_area=8000, morph_close=7)
+    assert len(boxes) >= 2
 
 
 def test_split_panels_finds_two_blobs() -> None:

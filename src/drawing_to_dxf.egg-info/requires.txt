@@ -3,6 +3,9 @@ numpy<3.0.0,>=1.24.0
 ezdxf<2.0.0,>=1.1.0
 pymupdf<2.0.0,>=1.23.0
 pillow<12.0.0,>=10.0.0
+scikit-image<0.25.0,>=0.22.0
+networkx<4.0,>=3.2
+shapely<3.0.0,>=2.0.0
 
 [dev]
 pytest<9.0.0,>=7.4.0

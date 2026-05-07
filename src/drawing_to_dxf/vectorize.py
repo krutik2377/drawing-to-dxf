@@ -3,26 +3,130 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
 from math import hypot
-from typing import DefaultDict
+from typing import DefaultDict, MutableMapping, Sequence
 
 import cv2
 import numpy as np
 
+from drawing_to_dxf.geometry_model import VectorDrawing, exploded_segments_for_sampling
+from drawing_to_dxf.geometry_intel import (
+    bridge_open_polyline_gaps,
+    dedupe_segment_list,
+    lsd_extract_segments,
+    remove_redundant_segments_vs_reference,
+)
+from drawing_to_dxf.ocr_extract import TextBox
+from drawing_to_dxf.segment_types import Segment
+from drawing_to_dxf.skeleton_vectorize import prepare_masked_gray
+from drawing_to_dxf.topology_clean import refine_vector_drawing
+from drawing_to_dxf.vector_fit import apply_polyline_fittings
 
-@dataclass
-class Segment:
-    x1: float
-    y1: float
-    x2: float
-    y2: float
 
-    def midpoint(self) -> tuple[float, float]:
-        return (0.5 * (self.x1 + self.x2), 0.5 * (self.y1 + self.y2))
+def extract_skeleton_vector_bundle(
+    gray: np.ndarray,
+    *,
+    annotation_boxes: Sequence[TextBox] | None = None,
+    mask_annotation_regions: bool = True,
+    min_line_length: int = 20,
+    merge_distance: float = 3.0,
+    collinear_merge_angle_deg: float = 5.0,
+    polyline_rdp_epsilon_px: float = 1.5,
+    annotation_pad_px: float = 5.0,
+    enable_circles: bool = True,
+    mask_text_interior_only: bool = False,
+    soft_ink_mask: bool = False,
+    enable_topology_clean: bool = True,
+    enable_arc_fitting: bool = False,
+    enable_loop_circle_fit: bool = False,
+    lsd_supplement: bool = False,
+    lsd_min_length_px: float | None = None,
+    geometry_bridge_gap_px: float = 0.0,
+    dedupe_residual_segments: bool = True,
+    debug_stages: MutableMapping[str, np.ndarray] | None = None,
+) -> tuple[VectorDrawing, list[Segment]]:
+    """Skeleton-graph vectorization (+ optional OCR masks) packaged with exploded segments for OCR linking."""
+    if gray.ndim != 2:
+        raise ValueError("grayscale expected")
+
+    from drawing_to_dxf.skeleton_vectorize import extract_vector_drawing as _extract_vd
+
+    boxes_arg = annotation_boxes if mask_annotation_regions else None
+
+    vd = _extract_vd(
+        gray,
+        annotation_boxes=boxes_arg if boxes_arg else None,
+        annotation_pad_px=float(annotation_pad_px),
+        min_skeleton_branch_px=max(12, min(160, min_line_length)),
+        rdp_tolerance_px=max(0.4, polyline_rdp_epsilon_px),
+        enable_circles=enable_circles,
+        mask_text_interior_only=mask_text_interior_only,
+        soft_ink_mask=soft_ink_mask,
+        debug_stages=debug_stages,
+    )
+    mb_px = float(max(12, min(160, min_line_length)))
+
+    if enable_topology_clean:
+        vd = refine_vector_drawing(vd, min_branch_px=mb_px)
+    if enable_arc_fitting or enable_loop_circle_fit:
+        vd = apply_polyline_fittings(
+            vd,
+            fit_arcs=enable_arc_fitting,
+            fit_circles_from_loops=enable_loop_circle_fit,
+        )
+
+    if geometry_bridge_gap_px > 0:
+        vd = bridge_open_polyline_gaps(vd, max_gap_px=geometry_bridge_gap_px)
+
+    if lsd_supplement:
+        mg = prepare_masked_gray(
+            gray,
+            annotation_boxes=boxes_arg if boxes_arg else None,
+            annotation_pad_px=float(annotation_pad_px),
+            mask_text_interior_only=mask_text_interior_only,
+        )
+        lsd_floor = float(lsd_min_length_px) if lsd_min_length_px is not None else float(max(min_line_length, 10))
+        raw_lsd = lsd_extract_segments(mg, min_length_px=max(6.0, lsd_floor * 0.85))
+        ref = exploded_segments_for_sampling(vd)
+        kept = remove_redundant_segments_vs_reference(raw_lsd, ref)
+        kept = dedupe_segment_list(kept)
+        if kept:
+            vd = VectorDrawing(
+                polylines=list(vd.polylines),
+                circles=list(vd.circles),
+                arcs=list(vd.arcs),
+                residual_segments=list(vd.residual_segments) + kept,
+            )
+
+    if dedupe_residual_segments and vd.residual_segments:
+        rd = dedupe_segment_list(list(vd.residual_segments))
+        if len(rd) != len(vd.residual_segments):
+            vd = VectorDrawing(
+                polylines=list(vd.polylines),
+                circles=list(vd.circles),
+                arcs=list(vd.arcs),
+                residual_segments=rd,
+            )
+
+    segs_raw = exploded_segments_for_sampling(vd)
+    sq = float(min_line_length * min_line_length)
+    segs = [s for s in segs_raw if hypot(s.x2 - s.x1, s.y2 - s.y1) >= min_line_length * 0.85]
+
+    if merge_distance > 0 and segs:
+        segs = _merge_close_endpoints(segs, merge_distance)
+    snap_for_refinement = merge_distance if merge_distance > 0 else 2.0
+    if collinear_merge_angle_deg > 0 and segs:
+        segs = _collapse_collinear_segments(segs, snap_for_refinement, collinear_merge_angle_deg)
+    if polyline_rdp_epsilon_px > 0 and segs:
+        segs = _simplify_degree2_chains_rdp(segs, snap_for_refinement, polyline_rdp_epsilon_px)
+    trimmed = []
+    for s in segs:
+        if hypot(s.x2 - s.x1, s.y2 - s.y1) * hypot(s.x2 - s.x1, s.y2 - s.y1) >= sq * 0.25:
+            trimmed.append(s)
+    return vd, trimmed if trimmed else segs_raw
 
 
-def extract_segments(
+def _legacy_hough_extract_segments(
     gray: np.ndarray,
     *,
     canny1: int = 40,
@@ -83,6 +187,71 @@ def extract_segments(
         segs = _simplify_degree2_chains_rdp(segs, snap_for_refinement, polyline_rdp_epsilon_px)
 
     return segs
+
+
+def extract_segments(
+    gray: np.ndarray,
+    *,
+    canny1: int = 40,
+    canny2: int = 120,
+    hough_threshold: int = 30,
+    min_line_length: int = 20,
+    max_line_gap: int = 12,
+    merge_distance: float = 3.0,
+    collinear_merge_angle_deg: float = 5.0,
+    polyline_rdp_epsilon_px: float = 1.5,
+    legacy_vectorize_hough: bool = False,
+    annotation_boxes: Sequence[TextBox] | None = None,
+    mask_annotation_regions: bool = True,
+    annotation_pad_px: float = 10.0,
+    enable_circles: bool = True,
+    mask_text_interior_only: bool = False,
+    soft_ink_mask: bool = False,
+    enable_topology_clean: bool = False,
+    enable_arc_fitting: bool = False,
+    enable_loop_circle_fit: bool = False,
+    lsd_supplement: bool = False,
+    lsd_min_length_px: float | None = None,
+    geometry_bridge_gap_px: float = 0.0,
+    dedupe_residual_segments: bool = True,
+) -> list[Segment]:
+    """Primary path: OCR-mask aware skeleton-graph tracing (:mod:`drawing_to_dxf.skeleton_vectorize`)."""
+    _ = canny1, canny2, hough_threshold, max_line_gap  # legacy kwargs retained for callers/tests
+
+    if legacy_vectorize_hough:
+        return _legacy_hough_extract_segments(
+            gray,
+            canny1=canny1,
+            canny2=canny2,
+            hough_threshold=hough_threshold,
+            min_line_length=min_line_length,
+            max_line_gap=max_line_gap,
+            merge_distance=merge_distance,
+            collinear_merge_angle_deg=collinear_merge_angle_deg,
+            polyline_rdp_epsilon_px=polyline_rdp_epsilon_px,
+        )
+
+    _vd, sg = extract_skeleton_vector_bundle(
+        gray,
+        annotation_boxes=annotation_boxes,
+        mask_annotation_regions=mask_annotation_regions,
+        min_line_length=min_line_length,
+        merge_distance=merge_distance,
+        collinear_merge_angle_deg=collinear_merge_angle_deg,
+        polyline_rdp_epsilon_px=polyline_rdp_epsilon_px,
+        annotation_pad_px=annotation_pad_px,
+        enable_circles=enable_circles,
+        mask_text_interior_only=mask_text_interior_only,
+        soft_ink_mask=soft_ink_mask,
+        enable_topology_clean=enable_topology_clean,
+        enable_arc_fitting=enable_arc_fitting,
+        enable_loop_circle_fit=enable_loop_circle_fit,
+        lsd_supplement=lsd_supplement,
+        lsd_min_length_px=lsd_min_length_px,
+        geometry_bridge_gap_px=geometry_bridge_gap_px,
+        dedupe_residual_segments=dedupe_residual_segments,
+    )
+    return sg
 
 
 def _dist(p: tuple[float, float], q: tuple[float, float]) -> float:

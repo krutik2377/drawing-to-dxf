@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from drawing_to_dxf.geometry_model import VectorDrawing
 from drawing_to_dxf.ocr_extract import TextBox, _expand_box, point_in_box
-from drawing_to_dxf.vectorize import Segment
+from drawing_to_dxf.segment_types import Segment
 
 
 @dataclass
@@ -14,6 +15,7 @@ class PartGroup:
     label_center: tuple[float, float]
     label_box_pad: tuple[float, float, float, float]
     segments: list[Segment] = field(default_factory=list)
+    vector_drawing: VectorDrawing | None = None
 
 
 def _seg_id(seg: Segment) -> int:

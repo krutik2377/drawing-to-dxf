@@ -1,4 +1,8 @@
-"""Preprocess → panel split → vectorize each crop → one DXF per panel."""
+"""Preprocess → panel split → vectorize each crop → one DXF per panel.
+
+Stages align with ``raster_pipeline_flow.CANONICAL_PIPELINE_STEPS``; manifests include
+``pipeline_flow`` for the same 20-step checklist (panel split augments step 15).
+"""
 
 from __future__ import annotations
 
@@ -16,15 +20,19 @@ from drawing_to_dxf.export_dxf import (
     export_segments_only,
     export_viewer_layout_dxf,
 )
+from drawing_to_dxf.geometry_intel import count_corner_rectangles
+from drawing_to_dxf.geometry_model import VectorDrawing, exploded_segments_for_sampling
 from drawing_to_dxf.link_parts import PartGroup
 from drawing_to_dxf.ocr_extract import (
     default_part_pattern,
     extract_text_boxes,
     filter_part_candidates,
 )
+from drawing_to_dxf.panel_debug import write_panel_trace_debug
 from drawing_to_dxf.panel_split import split_panels
 from drawing_to_dxf.preprocess import load_image_bgr, load_pdf_page_as_bgr, preprocess
-from drawing_to_dxf.vectorize import Segment, extract_segments
+from drawing_to_dxf.raster_pipeline_flow import pipeline_flow_manifest_rows
+from drawing_to_dxf.vectorize import extract_skeleton_vector_bundle
 
 
 @dataclass
@@ -42,9 +50,20 @@ class PanelDxfRunConfig:
     panel_min_gap: int = 48
     panel_min_short_side_px: int = 80
     panel_max_aspect_ratio: float = 10.0
+    panel_gap_split_fallback: bool = True
+    panel_split_strategy: str = "auto"
+    exclude_corner_title_block: bool = True
     segment_merge_distance_px: float = 5.0
     vector_collinear_merge_angle_deg: float = 5.0
     vector_polyline_rdp_epsilon_px: float = 1.5
+    mask_annotation_via_ocr_crop: bool = True
+    skeleton_annotation_pad_px: float = 5.0
+    mask_text_interior_only: bool = True
+    soft_ink_mask: bool = True
+    enable_topology_clean: bool = True
+    enable_arc_fitting: bool = True
+    enable_loop_circle_fit: bool = True
+    enable_skeleton_circles: bool = False
     skip_ocr: bool = False
     ocr_gpu: bool = False
     part_regex: str | None = None
@@ -53,6 +72,12 @@ class PanelDxfRunConfig:
     write_viewer_bundle: bool = True
     viewer_layout_gap_mm: float = 25.0
     emit_root_panel_dxfs: bool = False
+    trace_debug_dir: Path | None = None
+    vectorize_lsd_supplement: bool = False
+    vectorize_lsd_min_length_px: float | None = None
+    geometry_bridge_gap_px: float = 0.0
+    dedupe_geometry_residuals: bool = True
+    raster_dpi_nominal: float | None = None
 
 
 @dataclass
@@ -88,22 +113,22 @@ def _load_bgr(cfg: PanelDxfRunConfig) -> np.ndarray:
     return img
 
 
-def _pick_part_id_from_ocr(
+def _analyze_crop_easyocr(
     gray_crop: np.ndarray,
     cfg: PanelDxfRunConfig,
-) -> tuple[str | None, tuple[float, float] | None]:
-    """Return best (part_id, label_center) from EasyOCR + regex, or (None, None)."""
+) -> tuple[list, str | None, tuple[float, float] | None]:
+    """Return (boxes, best_part_id_match, center_of_that_label_or_None)."""
     pat = re.compile(cfg.part_regex) if cfg.part_regex else default_part_pattern()
     try:
-        boxes = extract_text_boxes(gray_crop, gpu=cfg.ocr_gpu)
+        boxes_local = extract_text_boxes(gray_crop, gpu=cfg.ocr_gpu)
     except ImportError:
-        return None, None
-    labeled = filter_part_candidates(boxes, pat, min_confidence=cfg.ocr_min_confidence)
-    if not labeled:
-        return None, None
-    labeled.sort(key=lambda t: (-t[0].confidence, t[0].y0))
-    tb, pid = labeled[0]
-    return pid, tb.center()
+        return [], None, None
+    labeled_local = filter_part_candidates(boxes_local, pat, min_confidence=cfg.ocr_min_confidence)
+    if not labeled_local:
+        return boxes_local, None, None
+    labeled_local.sort(key=lambda t: (-t[0].confidence, t[0].y0))
+    tb_hit, pid = labeled_local[0]
+    return boxes_local, pid, tb_hit.center()
 
 
 def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
@@ -135,7 +160,9 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
             "DXF coordinates match processed pixels; calibrate --mm-per-pixel if needed."
         )
 
-    min_len = max(5, int(round(cfg.min_line_length * pre.scale)))
+    nominal_dpi = cfg.raster_dpi_nominal if cfg.raster_dpi_nominal is not None else cfg.pdf_dpi
+    dpi_scale = float(nominal_dpi) / 150.0
+    min_len = max(5, int(round(cfg.min_line_length * pre.scale * dpi_scale)))
     h_full, w_full = pre.gray.shape[:2]
     boxes = split_panels(
         pre.gray,
@@ -143,6 +170,9 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
         min_gap_px=cfg.panel_min_gap,
         min_short_side_px=cfg.panel_min_short_side_px,
         max_aspect_ratio=cfg.panel_max_aspect_ratio,
+        gap_split_fallback=cfg.panel_gap_split_fallback,
+        strategy=cfg.panel_split_strategy,
+        exclude_corner_title_block=cfg.exclude_corner_title_block,
     )
 
     if len(boxes) == 1:
@@ -173,18 +203,39 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
     for i, (px, py, pw, ph) in enumerate(boxes):
         crop = pre.gray[py : py + ph, px : px + pw]
         crop_h, crop_w = crop.shape[:2]
-        segs: list[Segment] = extract_segments(
+
+        ocr_boxes_crop: list = []
+        pid: str | None = None
+        label_center: tuple[float, float] | None = None
+        if not skip_ocr_effective:
+            ocr_boxes_crop, pid, label_center = _analyze_crop_easyocr(crop, cfg)
+
+        trace_dbg = cfg.trace_debug_dir is not None
+        stage_images: dict[str, Any] = {}
+        vd, segs = extract_skeleton_vector_bundle(
             crop,
+            annotation_boxes=ocr_boxes_crop if (cfg.mask_annotation_via_ocr_crop and ocr_boxes_crop) else [],
+            mask_annotation_regions=bool(cfg.mask_annotation_via_ocr_crop and len(ocr_boxes_crop) > 0),
             min_line_length=min_len,
             merge_distance=cfg.segment_merge_distance_px,
             collinear_merge_angle_deg=cfg.vector_collinear_merge_angle_deg,
             polyline_rdp_epsilon_px=cfg.vector_polyline_rdp_epsilon_px,
+            annotation_pad_px=cfg.skeleton_annotation_pad_px,
+            enable_circles=cfg.enable_skeleton_circles,
+            mask_text_interior_only=cfg.mask_text_interior_only,
+            soft_ink_mask=cfg.soft_ink_mask,
+            enable_topology_clean=cfg.enable_topology_clean,
+            enable_arc_fitting=cfg.enable_arc_fitting,
+            enable_loop_circle_fit=cfg.enable_loop_circle_fit,
+            lsd_supplement=cfg.vectorize_lsd_supplement,
+            lsd_min_length_px=cfg.vectorize_lsd_min_length_px,
+            geometry_bridge_gap_px=cfg.geometry_bridge_gap_px,
+            dedupe_residual_segments=cfg.dedupe_geometry_residuals,
+            debug_stages=stage_images if trace_dbg else None,
         )
-
-        pid: str | None = None
-        label_center: tuple[float, float] | None = None
-        if not skip_ocr_effective:
-            pid, label_center = _pick_part_id_from_ocr(crop, cfg)
+        if trace_dbg and cfg.trace_debug_dir is not None:
+            write_panel_trace_debug(Path(cfg.trace_debug_dir), i, crop, vd, stage_images)
+        exploded = exploded_segments_for_sampling(vd)
 
         if pid is None:
             part_id = f"panel_{i:02d}"
@@ -211,14 +262,23 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
             part_id=part_id,
             label_center=lc,
             label_box_pad=(lc_x - 1.0, lc_y - 1.0, lc_x + 1.0, lc_y + 1.0),
-            segments=list(segs),
+            segments=list(exploded if exploded else segs),
+            vector_drawing=vd,
         )
 
-        if segs:
+        if not vd.is_empty():
+            export_part_dxf(outp, group, img_height_px=float(crop_h), mm_per_pixel=cfg.mm_per_pixel)
+        elif segs:
             export_part_dxf(outp, group, img_height_px=float(crop_h), mm_per_pixel=cfg.mm_per_pixel)
         else:
-            export_segments_only(outp, [], img_height_px=float(crop_h), mm_per_pixel=cfg.mm_per_pixel)
-            warnings.append(f"Panel {i}: no line segments in crop — wrote empty DXF.")
+            export_segments_only(
+                outp,
+                [],
+                img_height_px=float(crop_h),
+                mm_per_pixel=cfg.mm_per_pixel,
+                vector_drawing=None,
+            )
+            warnings.append(f"Panel {i}: skeleton produced no primitives — wrote empty DXF.")
 
         if cfg.emit_root_panel_dxfs and cfg.write_viewer_bundle:
             shutil.copy2(outp, out_dir / root_name)
@@ -229,15 +289,19 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
         records.append(
             {
                 "index": i,
-                "bbox_px": {"x": px, "y": py, "w": pw, "h": ph},
+                "bbox_px": {"x": int(px), "y": int(py), "w": int(pw), "h": int(ph)},
                 "crop_size_px": {"width": int(crop_w), "height": int(crop_h)},
                 "part_id_guess": pid,
                 "exported_part_id": part_id,
-                "segment_count": len(segs),
+                "segment_count": len(exploded if exploded else segs),
+                "primitive_polylines": len(vd.polylines),
+                "primitive_circles": len(vd.circles),
+                "primitive_arcs": len(vd.arcs),
+                "primitive_residuals": len(vd.residual_segments),
+                "rectangle_like_polylines": count_corner_rectangles(vd),
                 "dxf": str(outp.resolve()),
             }
         )
-
     viewer_bundle_dir: Path | None = None
     viewer_primary_dxf: Path | None = None
 
@@ -279,6 +343,7 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
             {
                 "version": 1,
                 "pipeline": "panels",
+                "pipeline_flow": pipeline_flow_manifest_rows(),
                 "input": str(cfg.input_path.resolve()),
                 "processed_size_px": {"width": int(w_full), "height": int(h_full)},
                 "preprocess_scale_from_original": pre.scale,
@@ -292,6 +357,18 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
                     "panel_min_gap": cfg.panel_min_gap,
                     "panel_min_short_side_px": cfg.panel_min_short_side_px,
                     "panel_max_aspect_ratio": cfg.panel_max_aspect_ratio,
+                    "panel_gap_split_fallback": cfg.panel_gap_split_fallback,
+                    "panel_split_strategy": cfg.panel_split_strategy,
+                    "exclude_corner_title_block": cfg.exclude_corner_title_block,
+                    "mask_annotation_via_ocr_crop": cfg.mask_annotation_via_ocr_crop,
+                    "skeleton_annotation_pad_px": cfg.skeleton_annotation_pad_px,
+                    "mask_text_interior_only": cfg.mask_text_interior_only,
+                    "soft_ink_mask": cfg.soft_ink_mask,
+                    "enable_topology_clean": cfg.enable_topology_clean,
+                    "enable_arc_fitting": cfg.enable_arc_fitting,
+                    "enable_loop_circle_fit": cfg.enable_loop_circle_fit,
+                    "enable_skeleton_circles": cfg.enable_skeleton_circles,
+                    "trace_debug_dir": str(Path(cfg.trace_debug_dir).resolve()) if cfg.trace_debug_dir else None,
                     "segment_merge_distance_px": cfg.segment_merge_distance_px,
                     "vector_collinear_merge_angle_deg": cfg.vector_collinear_merge_angle_deg,
                     "vector_polyline_rdp_epsilon_px": cfg.vector_polyline_rdp_epsilon_px,
@@ -299,6 +376,12 @@ def run_panel_dxfs(cfg: PanelDxfRunConfig) -> PanelDxfRunResult:
                     "write_viewer_bundle": cfg.write_viewer_bundle,
                     "viewer_layout_gap_mm": cfg.viewer_layout_gap_mm,
                     "emit_root_panel_dxfs": cfg.emit_root_panel_dxfs,
+                    "vectorize_lsd_supplement": cfg.vectorize_lsd_supplement,
+                    "vectorize_lsd_min_length_px": cfg.vectorize_lsd_min_length_px,
+                    "geometry_bridge_gap_px": cfg.geometry_bridge_gap_px,
+                    "dedupe_geometry_residuals": cfg.dedupe_geometry_residuals,
+                    "raster_dpi_nominal": cfg.raster_dpi_nominal,
+                    "raster_dpi_effective": nominal_dpi,
                 },
                 "outputs": {
                     "manifest": str(manifest_path.resolve()),

@@ -9,6 +9,9 @@ Requires-Dist: numpy<3.0.0,>=1.24.0
 Requires-Dist: ezdxf<2.0.0,>=1.1.0
 Requires-Dist: pymupdf<2.0.0,>=1.23.0
 Requires-Dist: pillow<12.0.0,>=10.0.0
+Requires-Dist: scikit-image<0.25.0,>=0.22.0
+Requires-Dist: networkx<4.0,>=3.2
+Requires-Dist: shapely<3.0.0,>=2.0.0
 Provides-Extra: ocr
 Requires-Dist: easyocr>=1.7.0; extra == "ocr"
 Provides-Extra: ui

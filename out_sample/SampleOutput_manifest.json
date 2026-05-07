@@ -1,0 +1,375 @@
+{
+  "version": 2,
+  "pipeline_flow": [
+    {
+      "step": 1,
+      "title": "Load raster image",
+      "implementation": "preprocess.load_image_bgr, preprocess.load_pdf_page_as_bgr; pipeline.load_input_bgr / panel_dxf_pipeline._load_bgr"
+    },
+    {
+      "step": 2,
+      "title": "Convert to grayscale",
+      "implementation": "preprocess.preprocess (cv2.cvtColor BGR\u2192GRAY)"
+    },
+    {
+      "step": 3,
+      "title": "Apply adaptive thresholding",
+      "implementation": "annotation_clean.inks_mask_from_gray (cv2.adaptiveThreshold ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV)"
+    },
+    {
+      "step": 4,
+      "title": "Perform deskewing/alignment",
+      "implementation": "preprocess._deskew_gray (invoked from preprocess.preprocess when deskew=True)"
+    },
+    {
+      "step": 5,
+      "title": "Remove noise",
+      "implementation": "preprocess.preprocess bilateral denoise; skeleton_vectorize.extract_vector_drawing remove_small_objects on foreground before skeletonize"
+    },
+    {
+      "step": 6,
+      "title": "Apply morphology closing to reconnect broken lines",
+      "implementation": "annotation_clean.suppress_hatches_and_dimensions MORPH_CLOSE on binary ink (when suppress_ruling_lines=True); preprocess._deskew_gray uses a small close on Otsu mask"
+    },
+    {
+      "step": 7,
+      "title": "Separate OCR/text layer from geometry layer",
+      "implementation": "ocr_extract.extract_text_boxes; annotation_clean.apply_text_masks / apply_text_masks_interior_only before inks_mask_from_gray"
+    },
+    {
+      "step": 8,
+      "title": "Detect line segments using LSD/Hough Transform",
+      "implementation": "Primary path: skeleton_graph.trace_skeleton_polylines. Alternates: vectorize._legacy_hough_extract_segments (HoughLinesP). Optional supplement: geometry_intel.lsd_extract_segments (cv2.createLineSegmentDetector) via --vectorize-lsd-supplement in vectorize.extract_skeleton_vector_bundle."
+    },
+    {
+      "step": 9,
+      "title": "Detect circles/arcs using HoughCircles",
+      "implementation": "skeleton_vectorize.detect_circles (optional, off by default): tighter Hough params, rim + **hole-interior** validation on binary ink, hard cap on count. Enable with --skeleton-circles. vector_fit.apply_polyline_fittings for arc / loop-to-CIRCLE when arc fitting is on."
+    },
+    {
+      "step": 10,
+      "title": "Detect rectangles and closed polylines",
+      "implementation": "Closed loops: skeleton traces with closed=True \u2192 geometry_model.PolylineDef.closed. Orthogonal 4-gons tallied as rectangle_like_polylines (geometry_intel.count_corner_rectangles); no separate DXF RECTANGLE entity type."
+    },
+    {
+      "step": 11,
+      "title": "Snap nearby endpoints together",
+      "implementation": "vectorize.extract_skeleton_vector_bundle \u2192 _merge_close_endpoints on exploded segments"
+    },
+    {
+      "step": 12,
+      "title": "Merge collinear and overlapping lines",
+      "implementation": "topology_clean.refine_vector_drawing; vectorize._collapse_collinear_segments; merge_collinear runs inside topology_clean"
+    },
+    {
+      "step": 13,
+      "title": "Reconstruct topology graph/connectivity",
+      "implementation": "skeleton_graph.skeleton_adjacency_graph + trace_skeleton_polylines"
+    },
+    {
+      "step": 14,
+      "title": "Detect dimensions, arrows, and extension lines",
+      "implementation": "Partial: annotation_clean.suppress_hatches_and_dimensions removes long horizontal ruling motifs; no dedicated arrow/dimension classifier."
+    },
+    {
+      "step": 15,
+      "title": "Group related entities into drawing parts/blocks",
+      "implementation": "pipeline: link_geometry.link_vector_geometry_to_parts + link_parts.PartGroup; panels: panel_split.split_panels then per-crop export"
+    },
+    {
+      "step": 16,
+      "title": "Preserve original scaling and coordinates",
+      "implementation": "PreprocessResult.original_shape, scale; RunConfig.mm_per_pixel; export_dxf.image_xy_to_dxf consistent Y-flip + scale in manifests"
+    },
+    {
+      "step": 17,
+      "title": "Convert primitives into CAD entities (LINE, ARC, CIRCLE, TEXT, etc.)",
+      "implementation": "export_dxf._emit_vector_entities: LWPOLYLINE, ARC, CIRCLE, LINE residuals; TEXT via PartGroup label points on part layers"
+    },
+    {
+      "step": 18,
+      "title": "Generate structured DXF entities/layers",
+      "implementation": "export_dxf.export_merged_dxf / export_part_dxf / export_segments_only (layer-per-part or GEOMETRY/LABEL conventions)"
+    },
+    {
+      "step": 19,
+      "title": "Export final DXF file",
+      "implementation": "ezdxf writes in export_dxf; paths recorded in *_manifest.json"
+    },
+    {
+      "step": 20,
+      "title": "Run post-processing cleanup and validation",
+      "implementation": "topology_clean.refine_vector_drawing; vector_fit.apply_polyline_fittings; vectorize length filters; optional geometry_intel bridge_open_polyline_gaps + residual dedupe; geometry_intel.geometry_quality_report (confidence heuristic) + optional pipeline_timings_ms; pipeline warnings in manifest."
+    }
+  ],
+  "input": "C:\\Users\\admin\\Desktop\\HyzenInterview\\Resource\\SampleOutput.png",
+  "processed_size_px": {
+    "width": 1244,
+    "height": 1236
+  },
+  "original_raster_shape": {
+    "height": 1236,
+    "width": 1244
+  },
+  "preprocess_scale_from_original": 1.0,
+  "mm_per_pixel": 1.0,
+  "segment_count": 308,
+  "primitive_count": 423,
+  "ocr_text_boxes": 86,
+  "parts": [
+    {
+      "part_id": "150",
+      "segment_count": 0,
+      "label_xy_px": {
+        "x": 66.0,
+        "y": 13.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_150.dxf"
+    },
+    {
+      "part_id": "720",
+      "segment_count": 3,
+      "label_xy_px": {
+        "x": 111.0,
+        "y": 11.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_720.dxf"
+    },
+    {
+      "part_id": "740",
+      "segment_count": 29,
+      "label_xy_px": {
+        "x": 870.0,
+        "y": 9.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_740.dxf"
+    },
+    {
+      "part_id": "721",
+      "segment_count": 39,
+      "label_xy_px": {
+        "x": 167.0,
+        "y": 107.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_721.dxf"
+    },
+    {
+      "part_id": "738",
+      "segment_count": 18,
+      "label_xy_px": {
+        "x": 375.0,
+        "y": 209.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_738.dxf"
+    },
+    {
+      "part_id": "236",
+      "segment_count": 18,
+      "label_xy_px": {
+        "x": 1155.0,
+        "y": 204.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_236.dxf"
+    },
+    {
+      "part_id": "23730",
+      "segment_count": 9,
+      "label_xy_px": {
+        "x": 1202.0,
+        "y": 203.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_23730.dxf"
+    },
+    {
+      "part_id": "722",
+      "segment_count": 49,
+      "label_xy_px": {
+        "x": 166.0,
+        "y": 288.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_722.dxf"
+    },
+    {
+      "part_id": "734",
+      "segment_count": 28,
+      "label_xy_px": {
+        "x": 972.0,
+        "y": 355.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_734.dxf"
+    },
+    {
+      "part_id": "741",
+      "segment_count": 19,
+      "label_xy_px": {
+        "x": 538.0,
+        "y": 398.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_741.dxf"
+    },
+    {
+      "part_id": "732",
+      "segment_count": 29,
+      "label_xy_px": {
+        "x": 718.0,
+        "y": 399.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_732.dxf"
+    },
+    {
+      "part_id": "729",
+      "segment_count": 7,
+      "label_xy_px": {
+        "x": 1206.0,
+        "y": 401.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_729.dxf"
+    },
+    {
+      "part_id": "723",
+      "segment_count": 31,
+      "label_xy_px": {
+        "x": 124.0,
+        "y": 472.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_723.dxf"
+    },
+    {
+      "part_id": "742",
+      "segment_count": 13,
+      "label_xy_px": {
+        "x": 345.0,
+        "y": 473.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_742.dxf"
+    },
+    {
+      "part_id": "735",
+      "segment_count": 28,
+      "label_xy_px": {
+        "x": 1103.0,
+        "y": 567.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_735.dxf"
+    },
+    {
+      "part_id": "724",
+      "segment_count": 15,
+      "label_xy_px": {
+        "x": 132.0,
+        "y": 587.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_724.dxf"
+    },
+    {
+      "part_id": "145",
+      "segment_count": 10,
+      "label_xy_px": {
+        "x": 1078.0,
+        "y": 788.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_145.dxf"
+    },
+    {
+      "part_id": "736",
+      "segment_count": 10,
+      "label_xy_px": {
+        "x": 1133.0,
+        "y": 786.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_736.dxf"
+    },
+    {
+      "part_id": "728",
+      "segment_count": 87,
+      "label_xy_px": {
+        "x": 370.0,
+        "y": 953.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_728.dxf"
+    },
+    {
+      "part_id": "733",
+      "segment_count": 26,
+      "label_xy_px": {
+        "x": 862.0,
+        "y": 953.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_733.dxf"
+    },
+    {
+      "part_id": "85737",
+      "segment_count": 27,
+      "label_xy_px": {
+        "x": 1131.0,
+        "y": 1012.0
+      },
+      "dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_85737.dxf"
+    }
+  ],
+  "outputs": {
+    "assembly_layers_dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_assembly_layers.dxf",
+    "per_part": {
+      "150": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_150.dxf",
+      "720": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_720.dxf",
+      "740": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_740.dxf",
+      "721": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_721.dxf",
+      "738": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_738.dxf",
+      "236": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_236.dxf",
+      "23730": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_23730.dxf",
+      "722": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_722.dxf",
+      "734": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_734.dxf",
+      "741": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_741.dxf",
+      "732": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_732.dxf",
+      "729": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_729.dxf",
+      "723": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_723.dxf",
+      "742": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_742.dxf",
+      "735": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_735.dxf",
+      "724": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_724.dxf",
+      "145": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_145.dxf",
+      "736": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_736.dxf",
+      "728": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_728.dxf",
+      "733": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_733.dxf",
+      "85737": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sample\\SampleOutput_part_85737.dxf"
+    }
+  },
+  "warnings": [
+    "Some matched part IDs have no linked geometry: 150"
+  ],
+  "geometry_quality": {
+    "confidence_score": 0.75,
+    "mean_segment_length_px": 38.80585267118621,
+    "polylines": 413,
+    "closed_polylines": 0,
+    "circles": 10,
+    "arcs": 0,
+    "residual_segments": 0,
+    "rectangle_like_polylines": 0
+  },
+  "parameters": {
+    "link_mode": "hybrid",
+    "padding_px": 120.0,
+    "max_nearest_px": 180.0,
+    "skip_ocr": false,
+    "mask_annotation_via_ocr": true,
+    "min_line_length": 20,
+    "segment_merge_distance_px": 5.0,
+    "vector_collinear_merge_angle_deg": 5.0,
+    "vector_polyline_rdp_epsilon_px": 1.5,
+    "legacy_vectorize_hough": false,
+    "skeleton_annotation_pad_px": 10.0,
+    "enable_skeleton_circles": true,
+    "mask_text_interior_only": true,
+    "soft_ink_mask": true,
+    "enable_topology_clean": true,
+    "enable_arc_fitting": true,
+    "enable_loop_circle_fit": true,
+    "vectorize_lsd_supplement": false,
+    "vectorize_lsd_min_length_px": null,
+    "geometry_bridge_gap_px": 0.0,
+    "dedupe_geometry_residuals": true,
+    "raster_dpi_nominal": null,
+    "raster_dpi_effective": 150.0,
+    "profile_pipeline": false
+  }
+}

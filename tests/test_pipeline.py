@@ -7,8 +7,9 @@ from drawing_to_dxf.vectorize import extract_segments
 
 def _synthetic_gray() -> np.ndarray:
     img = np.full((200, 300), 255, dtype=np.uint8)
-    img[50:51, 40:260] = 0
-    img[40:180, 150:151] = 0
+    # Thick strokes survive adaptive threshold + skeletonizer (thin 1px lines do not).
+    img[49:53, 40:262] = 0
+    img[40:182, 149:154] = 0
     return img
 
 
@@ -33,4 +34,4 @@ def test_export_dxf_writes(tmp_path) -> None:
     export_segments_only(outp, segs, img_height_px=100.0, mm_per_pixel=1.0)
     assert outp.exists()
     text = outp.read_text(encoding="utf-8", errors="ignore")
-    assert "LINE" in text
+    assert "LINE" in text or "LWPOLYLINE" in text.upper()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -62,7 +63,16 @@ def extract_text_boxes(
     if languages is None:
         languages = ["en", "de"]
 
-    reader = easyocr.Reader(languages, gpu=gpu, quantize=quantize, verbose=False)
+    if gpu:
+        reader = easyocr.Reader(languages, gpu=True, quantize=quantize, verbose=False)
+    else:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=".*pin_memory.*accelerator.*",
+                category=UserWarning,
+            )
+            reader = easyocr.Reader(languages, gpu=False, quantize=quantize, verbose=False)
     # easyocr expects BGR or RGB; grayscale 3-channel
     if gray.ndim == 2:
         img = np.stack([gray, gray, gray], axis=-1)
