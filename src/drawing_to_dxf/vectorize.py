@@ -255,15 +255,30 @@ def _simplify_degree2_chains_rdp(segs: list[Segment], tol: float, epsilon: float
         if prev != anchor:
             chain.append(prev)
         chain.append(curr)
+        seen: set[tuple[int, int]] = set(chain)
         _p, c = prev, curr
-        while c not in junctions and len(adj[c]) == 2:
+        max_steps = max(len(adj) + 12, 64)
+        steps = 0
+        while c not in junctions and len(adj[c]) == 2 and steps < max_steps:
+            steps += 1
             nbs = [x for x in adj[c] if x != _p]
             if len(nbs) != 1:
                 break
             nxt = nbs[0]
+            if nxt in seen:
+                if nxt == anchor and len(chain) >= 3:
+                    chain.append(nxt)
+                break
             chain.append(nxt)
+            seen.add(nxt)
             _p, c = c, nxt
         return chain
+
+    def record_walk_chain(ch: list[tuple[int, int]]) -> None:
+        if len(ch) >= 4 and ch[0] == ch[-1]:
+            record_chain(ch[:-1], closed=True)
+        else:
+            record_chain(ch, closed=False)
 
     def mark_chain_edges(chain: list[tuple[int, int]]) -> None:
         for a, b in zip(chain[:-1], chain[1:], strict=False):
@@ -276,7 +291,7 @@ def _simplify_degree2_chains_rdp(segs: list[Segment], tol: float, epsilon: float
                 continue
             ch = walk_from(j, nb, j)
             mark_chain_edges(ch)
-            record_chain(ch, closed=False)
+            record_walk_chain(ch)
 
     if not junctions:
         start = next(iter(adj))
@@ -310,7 +325,7 @@ def _simplify_degree2_chains_rdp(segs: list[Segment], tol: float, epsilon: float
                 continue
             ch = walk_from(k, nb, k)
             mark_chain_edges(ch)
-            record_chain(ch, closed=False)
+            record_walk_chain(ch)
 
     out: list[Segment] = []
     for pts, closed in zip(poly_pts, poly_closed, strict=True):

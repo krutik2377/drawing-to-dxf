@@ -74,7 +74,7 @@ def sheet_main(argv: list[str] | None = None) -> int:
     try:
         res = run_sheet(cfg)
     except Exception as e:  # noqa: BLE001
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error ({type(e).__name__}): {e}", file=sys.stderr)
         return 1
     print(f"Manifest: {res.manifest_path}")
     print(f"Composite: {res.composite_png}")
@@ -191,7 +191,7 @@ def panels_main(argv: list[str] | None = None) -> int:
     try:
         res = run_panel_dxfs(cfg)
     except Exception as e:  # noqa: BLE001
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error ({type(e).__name__}): {e}", file=sys.stderr)
         return 1
 
     print(f"Manifest: {res.manifest_path}")
@@ -310,7 +310,7 @@ def convert_main(argv: list[str] | None = None) -> int:
     try:
         res = run(cfg)
     except Exception as e:  # noqa: BLE001
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error ({type(e).__name__}): {e}", file=sys.stderr)
         return 1
 
     print(f"Manifest: {res.manifest_path}")
