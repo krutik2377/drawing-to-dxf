@@ -41,7 +41,7 @@ def test_call_gemini_generate_content_parses_json(monkeypatch) -> None:
     ):
         out = call_gemini_generate_content(
             api_key="fake",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             png_bytes=b"\x89PNG\r\n\x1a\n",
             user_prompt='Return {"hello": true}',
             timeout_s=5.0,

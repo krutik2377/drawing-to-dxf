@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "drawing-to-dxf"
 version = "0.1.0"
-description = "Raster/PDF → DXF; shop sheets → AI JSON + composite PNG (OpenCV, ezdxf; optional EasyOCR, Ollama/OpenAI vision)."
+description = "Engineering drawing image/PDF → Gemini → Python per component → DXF + assembly (OpenCV, ezdxf)."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,16 +13,9 @@ dependencies = [
     "numpy>=1.24.0,<3.0.0",
     "ezdxf>=1.1.0,<2.0.0",
     "pymupdf>=1.23.0,<2.0.0",
-    "pillow>=10.0.0,<12.0.0",
-    "scikit-image>=0.22.0,<0.25.0",
-    "networkx>=3.2,<4.0",
-    "shapely>=2.0.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
-ocr = ["easyocr>=1.7.0"]
-ml = ["onnxruntime>=1.16.0,<2.0.0"]
-ui = ["streamlit>=1.28.0,<2.0.0"]
 dev = ["pytest>=7.4.0,<9.0.0"]
 
 [project.scripts]

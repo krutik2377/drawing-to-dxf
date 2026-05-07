@@ -1,0 +1,43 @@
+{
+  "stem": "Sample",
+  "input": "C:\\Users\\admin\\Desktop\\HyzenInterview\\Resource\\Sample.png",
+  "gemini_model": "gemini-2.5-flash",
+  "gemini_max_output_tokens": 65536,
+  "component_count_requested": 7,
+  "warnings": [],
+  "raw_text_path": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\Sample_gemini_codegen_raw.txt",
+  "components": {
+    "part_701": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_701.py"
+    },
+    "part_707": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_707.py"
+    },
+    "part_721": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_721.py"
+    },
+    "part_723": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_723.py"
+    },
+    "part_724": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_724.py"
+    },
+    "part_731": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_731.py"
+    },
+    "part_739": {
+      "script": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_scripts\\part_739.py"
+    }
+  },
+  "dxfs": {
+    "part_701": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_701.dxf",
+    "part_707": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_707.dxf",
+    "part_721": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_721.dxf",
+    "part_723": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_723.dxf",
+    "part_724": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_724.dxf",
+    "part_731": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_731.dxf",
+    "part_739": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\gemini_codegen_dxfs\\part_739.dxf"
+  },
+  "script_errors": {},
+  "assembly_dxf": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\Sample_gemini_codegen_assembly.dxf"
+}

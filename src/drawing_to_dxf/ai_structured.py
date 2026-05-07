@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+import socket
 import ssl
 import urllib.error
 import urllib.parse
@@ -156,41 +157,27 @@ def call_ollama_chat(
     return AIExtractResult(raw_text=str(raw), data=_extract_json_object(_message_text(raw)))
 
 
-def call_gemini_generate_content(
+def _gemini_generate_from_parts(
     *,
     api_key: str,
     model: str,
-    png_bytes: bytes,
-    user_prompt: str,
-    timeout_s: float = 120.0,
-) -> AIExtractResult:
-    """
-    Google AI Studio / Gemini with inline PNG (REST v1beta). Free-tier quota applies;
-    requires ``GEMINI_API_KEY`` or ``GOOGLE_API_KEY`` (see SheetRunConfig / CLI).
-    """
-    b64 = _b64_png(png_bytes)
+    user_parts: list[dict],
+    temperature: float,
+    timeout_s: float,
+    max_output_tokens: int | None = None,
+) -> str:
     model_slug = model.strip().removeprefix("models/")
     qs = urllib.parse.urlencode({"key": api_key})
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
         f"models/{urllib.parse.quote(model_slug)}:generateContent?{qs}"
     )
+    gen_cfg: dict[str, Any] = {"temperature": float(temperature)}
+    if max_output_tokens is not None:
+        gen_cfg["maxOutputTokens"] = int(max_output_tokens)
     body = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {"text": user_prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": "image/png",
-                            "data": b64,
-                        }
-                    },
-                ],
-            }
-        ],
-        "generationConfig": {"temperature": 0.1},
+        "contents": [{"role": "user", "parts": user_parts}],
+        "generationConfig": gen_cfg,
     }
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
@@ -203,6 +190,12 @@ def call_gemini_generate_content(
     try:
         with urllib.request.urlopen(req, timeout=timeout_s, context=ctx) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
+    except (TimeoutError, socket.timeout) as e:
+        raise RuntimeError(
+            f"Gemini request timed out after {timeout_s:g}s (large image or high "
+            "maxOutputTokens can need several minutes — try a higher --gemini-timeout, "
+            "or reduce --gemini-max-output-tokens / --max-side)."
+        ) from e
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
         raise RuntimeError(f"Gemini HTTP {e.code}: {err}") from e
@@ -219,8 +212,61 @@ def call_gemini_generate_content(
     raw = "".join(texts).strip()
     if not raw:
         raise RuntimeError(f"Gemini produced empty text: {payload!r}")
+    return raw
 
+
+def call_gemini_generate_content(
+    *,
+    api_key: str,
+    model: str,
+    png_bytes: bytes,
+    user_prompt: str,
+    timeout_s: float = 120.0,
+) -> AIExtractResult:
+    """
+    Google AI Studio / Gemini with inline PNG (REST v1beta). Free-tier quota applies;
+    requires ``GEMINI_API_KEY`` or ``GOOGLE_API_KEY`` (see SheetRunConfig / CLI).
+    """
+    b64 = _b64_png(png_bytes)
+    raw = _gemini_generate_from_parts(
+        api_key=api_key,
+        model=model,
+        user_parts=[
+            {"text": user_prompt},
+            {"inline_data": {"mime_type": "image/png", "data": b64}},
+        ],
+        temperature=0.1,
+        timeout_s=timeout_s,
+    )
     return AIExtractResult(raw_text=raw, data=_extract_json_object(raw))
+
+
+def call_gemini_generate_content_raw(
+    *,
+    api_key: str,
+    model: str,
+    png_bytes: bytes,
+    user_prompt: str,
+    timeout_s: float = 120.0,
+    temperature: float = 0.2,
+    max_output_tokens: int | None = None,
+) -> str:
+    """
+    Same REST call as ``call_gemini_generate_content``, but returns the model text
+    without parsing JSON (for workflows that expect arbitrary structured text).
+    """
+    b64 = _b64_png(png_bytes)
+    return _gemini_generate_from_parts(
+        api_key=api_key,
+        model=model,
+        user_parts=[
+            {"text": user_prompt},
+            {"inline_data": {"mime_type": "image/png", "data": b64}},
+        ],
+        temperature=temperature,
+        timeout_s=timeout_s,
+        max_output_tokens=max_output_tokens,
+    )
 
 
 def call_gemini_generate_text(

@@ -3,9 +3,8 @@
 Remove generated outputs so you can rerun drawing-to-dxf with a clean tree.
 
 Default removes (if present), relative to repo root:
-  - out/
-  - out_sheet/
-  - out_panels/
+  - out_gemini_codegen/
+  - out/ out_sheet/ out_panels/ (legacy folder names if still present)
   - .pytest_cache/
 
 Use --include-venv only when you intend to recreate the virtualenv.
@@ -43,7 +42,7 @@ def main() -> int:
     parser.add_argument(
         "--include-venv",
         action="store_true",
-        help="Also delete .venv (you must recreate: python -m venv .venv && pip install -e \".[ocr]\")",
+        help="Also delete .venv (recreate: python -m venv .venv && pip install -e .)",
     )
     args = parser.parse_args()
 
@@ -51,14 +50,14 @@ def main() -> int:
     print(f"Repo: {root}")
     print()
 
-    for name in ("out", "out_sheet", "out_panels", ".pytest_cache"):
+    for name in ("out_gemini_codegen", "out", "out_sheet", "out_panels", ".pytest_cache"):
         _rm_tree(root / name)
 
     if args.include_venv:
         _rm_tree(root / ".venv")
         print()
         print("Recreate venv:  python -m venv .venv")
-        print("Then activate it and run:  pip install -e \".[ocr]\"")
+        print("Then activate it and run:  pip install -e .")
     else:
         print()
         print("Tip: pass --include-venv to also delete .venv, then reinstall deps.")
