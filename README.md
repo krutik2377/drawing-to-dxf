@@ -27,9 +27,17 @@ or
 drawing-to-dxf gemini-codegen "path\to\sheet.png" -o out_gemini_codegen
 ```
 
+**Component sheet only (5–7 parts, JSON + Markdown tables, no DXF):**
+
+```powershell
+drawing-to-dxf component-sheet "path\to\sheet.png" -o out_sheet
+```
+
+**With full codegen:** add `--sheet-report` for an extra Gemini pass that writes `*_component_sheet.json` and `*.md` next to the DXF outputs. Use `--assembly-layout grid --grid-columns 3` for a tiled assembly DXF instead of a single horizontal strip.
+
 **PDF:** `drawing-to-dxf draft.pdf --pdf-page 0 --pdf-dpi 200 -o out`
 
-**Useful flags:** `--gemini-model`, `--max-side`, `--gemini-max-output-tokens`, `--layout-gap-mm`, `--gemini-timeout`, `--script-timeout`
+**Useful flags:** `--gemini-model`, `--max-side`, `--gemini-max-output-tokens`, `--layout-gap-mm`, `--gemini-timeout`, `--script-timeout`, `--sheet-report`, `--assembly-layout`, `--grid-columns`
 
 See **`docs/CLEAN_AND_RUN.md`** for clean output cycles and a results table.
 

@@ -9,6 +9,7 @@ import ezdxf
 import pytest
 
 from drawing_to_dxf.gemini_cad_codegen import (
+    merge_dxfs_grid,
     merge_dxfs_horizontal,
     parse_codegen_json_payload,
 )
@@ -31,6 +32,22 @@ def test_parse_codegen_json_payload_strips_fence() -> None:
     text = f"```json\n{inner}\n```"
     d = parse_codegen_json_payload(text)
     assert d == {"only": "x = 1\n"}
+
+
+def test_merge_dxfs_grid_ncols_two(tmp_path: Path) -> None:
+    tiles = []
+    for i, tag in enumerate(["a", "b", "c"]):
+        p = tmp_path / f"{tag}.dxf"
+        doc = ezdxf.new()
+        doc.modelspace().add_line((0, i * 10), (80, i * 10))
+        doc.saveas(str(p))
+        tiles.append((tag, p))
+    out = tmp_path / "grid.dxf"
+    merge_dxfs_grid(tiles, out, gap_mm=5.0, ncols=2)
+    assert out.is_file()
+    doc = ezdxf.readfile(str(out))
+    lines = list(doc.modelspace().query("LINE"))
+    assert len(lines) >= 3
 
 
 def test_merge_dxfs_horizontal(tmp_path: Path) -> None:

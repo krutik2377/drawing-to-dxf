@@ -1,206 +1,62 @@
 Metadata-Version: 2.4
 Name: drawing-to-dxf
 Version: 0.1.0
-Summary: Raster/PDF → DXF; shop sheets → AI JSON + composite PNG (OpenCV, ezdxf; optional EasyOCR, Ollama/OpenAI vision).
+Summary: Engineering drawing image/PDF → Gemini → Python per component → DXF + assembly (OpenCV, ezdxf).
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 Requires-Dist: opencv-python-headless<5.0.0,>=4.8.0
 Requires-Dist: numpy<3.0.0,>=1.24.0
 Requires-Dist: ezdxf<2.0.0,>=1.1.0
 Requires-Dist: pymupdf<2.0.0,>=1.23.0
-Requires-Dist: pillow<12.0.0,>=10.0.0
-Requires-Dist: scikit-image<0.25.0,>=0.22.0
-Requires-Dist: networkx<4.0,>=3.2
-Requires-Dist: shapely<3.0.0,>=2.0.0
-Provides-Extra: ocr
-Requires-Dist: easyocr>=1.7.0; extra == "ocr"
-Provides-Extra: ml
-Requires-Dist: onnxruntime<2.0.0,>=1.16.0; extra == "ml"
-Provides-Extra: ui
-Requires-Dist: streamlit<2.0.0,>=1.28.0; extra == "ui"
 Provides-Extra: dev
 Requires-Dist: pytest<9.0.0,>=7.4.0; extra == "dev"
 
 # drawing-to-dxf
 
-Turn **raster or PDF engineering sheets** into **AutoCAD-compatible DXF** files: full-sheet vectorization plus an **optional heuristic split** into per-part drawings using **OCR** for stamped part numbers (for example `701`, `1024`).
+**Engineering drawing (image or PDF) → Gemini vision → Python script per component → DXF files + optional assembly DXF.**
 
-**AutoCAD is not required** to generate DXF. Open outputs in AutoCAD, BricsCAD, LibreCAD, or any tool that reads DXF.
-
-**Clean, install, and run (interview checklist):** [docs/CLEAN_AND_RUN.md](docs/CLEAN_AND_RUN.md)
-
----
-
-## What this project does (and does not do)
-
-| In scope | Out of scope |
-|----------|----------------|
-| Load PNG/JPG/TIFF/BMP or PDF (first page, configurable) | Guaranteed shop-ready dimensions without calibration or human review |
-| Denoise, optional mild deskew, safe downscale of huge scans | Perfect extraction from very dense lattice / hand-redlined drawings |
-| Line vectorization (Canny + Hough) | True 3D reconstruction or full multi-view reasoning |
-| Optional **EasyOCR** (en/de) + regex part IDs → **per-part DXF** | Legal/certified “as-built” drawings |
-
-Treat outputs as **draft geometry**: calibrate scale (`--mm-per-pixel`), tune linking parameters, and review in CAD before manufacturing.
-
----
+No AutoCAD required to generate DXF (open in AutoCAD, BricsCAD, LibreCAD, etc.).
 
 ## Install
 
-**Python 3.10+** recommended.
-
-### Core only (vectorize to DXF, no per-part OCR)
-
-```bash
+```powershell
+cd C:\Users\admin\Desktop\HyzenInterview
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # Linux/macOS
-
+.\.venv\Scripts\activate
 pip install -e .
 ```
 
-Or: `pip install -r requirements.txt` (core dependencies only; then `pip install -e .` if you use the CLI package).
-
-### With OCR (per-part split; pulls PyTorch / models on first run)
-
-```bash
-pip install -e ".[ocr]"
-```
-
-### Developers
-
-```bash
-pip install -e ".[ocr,dev]"
-pytest -q
-```
-
----
+Set **`GEMINI_API_KEY`** or **`GOOGLE_API_KEY`**.
 
 ## Usage
 
-```bash
-drawing-to-dxf sheet path\to\shop_parts.png -o out_sheet --ai ollama
+```powershell
+drawing-to-dxf "path\to\sheet.png" -o out_gemini_codegen
 ```
 
-**Sheet workflow** (`sheet` subcommand):
+or
 
-1. Preprocess and **split** the page into panel crops (`panel_split`).
-2. **EasyOCR** builds a text context string per panel (requires `pip install -e ".[ocr]"`).
-3. Optional **vision model** returns **structured JSON** per panel:
-   - `--ai none` — titles from OCR only; no network.
-   - `--ai ollama` — **free locally** (e.g. [Ollama](https://ollama.com/) + `llava` / a vision model). Set `--ollama-model`.
-   - `--ai openai` — OpenAI-compatible **paid** API; needs `OPENAI_API_KEY` (or Azure base URL). **This is not DALL·E** — it is chat/vision for JSON extraction.
-4. Writes **`<stem>_composite_layout.png`**: a **grid of the real panel crops** + titles (Pillow). This matches your sample **layout class** (many details on one sheet) without using generative “draw a drawing” APIs.
-
-Outputs: `*_sheet_manifest.json`, `*_panel_XX.png`, `*_composite_layout.png`.
-
-### DALL·E / “free image generation” (important)
-
-- **OpenAI DALL·E via API is paid** (per image; there is no durable free API tier for production use). Consumer/UI promos can differ — do not rely on them for automation.
-- **For shop drawings, avoid generative image models anyway:** they are not trustworthy for **true dimensions**, hole grids, or standards compliance.
-- **Recommended “free” AI paths here:** run a **vision LLM locally** (Ollama + llava/mistral-small3.1-vision etc.) for **understanding + JSON**, and build the final sheet by **compositing** crops or redrawing vectors (this repo’s `sheet` path uses compositing).
-
-Other free/community options (subject to change): local Stable Diffusion for textures **not** for fabrication drawings; some Hugging Face inference endpoints with rate limits — still inappropriate for metrology-heavy output.
-
----
-
-## Usage (DXF pipeline)
-
-```bash
-drawing-to-dxf path\to\sheet.png -o out
+```powershell
+drawing-to-dxf gemini-codegen "path\to\sheet.png" -o out_gemini_codegen
 ```
 
-**PDF:**
+**PDF:** `drawing-to-dxf draft.pdf --pdf-page 0 --pdf-dpi 200 -o out`
 
-```bash
-drawing-to-dxf drawing.pdf --pdf-page 0 --pdf-dpi 200 -o out
+**Useful flags:** `--gemini-model`, `--max-side`, `--gemini-max-output-tokens`, `--layout-gap-mm`, `--gemini-timeout`, `--script-timeout`
+
+See **`docs/CLEAN_AND_RUN.md`** for clean output cycles and a results table.
+
+## Security
+
+The tool **executes model-generated Python** on your machine. Use trusted inputs/models or an isolated environment.
+
+## Tests
+
+```powershell
+pip install -e ".[dev]"
+pytest -q
 ```
-
-**Vectorize only** (no OCR / no EasyOCR install):
-
-```bash
-drawing-to-dxf sheet.png --skip-ocr -o out
-```
-
-### Useful flags
-
-| Flag | Meaning |
-|------|---------|
-| `-o`, `--output-dir` | Output folder (default `./out`) |
-| `--mm-per-pixel` | Drawing scale: mm per **processed** pixel (default `1.0`) |
-| `--max-side` | Downscale longest edge (default `4096`; `0` = disable) |
-| `--skip-ocr` | Single DXF with all detected lines |
-| `--ocr-gpu` | EasyOCR with GPU if available |
-| `--link-mode hybrid\|bbox\|nearest` | How lines attach to part labels |
-| `--padding-px` | Grow OCR box for `bbox` / hybrid assignment |
-| `--max-nearest-px` | Max distance for nearest-neighbor assignment |
-| `--part-regex` | Custom regex for part numbers (default: 3–5 digits) |
-| `--min-line-length` | Shortest Hough segment (pixels, after preprocess) |
-| `--no-denoise` / `--no-deskew` | Disable preprocessing steps |
-
-Each run writes:
-
-- `<stem>_manifest.json` — sizes, counts, paths, warnings  
-- `<stem>_assembly_layers.dxf` — merged file (either all lines on one layer, or layers per part + `UNASSIGNED`)  
-- `<stem>_part_<id>.dxf` — one file per detected part when splitting succeeds  
-
----
-
-## Architecture: `sheet` workflow
-
-```text
-Input (multi-part shop sheet)
-    → preprocess + split panels
-    → OCR excerpt per panel
-    → [optional] vision LLM → JSON
-    → composite PNG (grid) + manifest
-```
-
----
-
-## Architecture (DXF pipeline)
-
-```text
-Input (image/PDF)
-    → preprocess (gray, denoise, deskew, optional resize)
-    → vectorize (segments)
-    → [optional] OCR (text boxes)
-    → [optional] filter part IDs (regex) + link segments (bbox / nearest / hybrid)
-    → export DXF (ezdxf) + manifest JSON
-```
-
-- **Coordinate system:** Image origin top-left; DXF uses **Y up** (flipped from image). Units are **millimeters** in DXF with length = pixel × `--mm-per-pixel` on the **processed** raster.
-
----
-
-## Edge cases handled in code
-
-- **Unicode paths on Windows:** image read uses `np.fromfile` + `cv2.imdecode`.
-- **Oversized rasters:** `--max-side` avoids memory blowups; manifest records scale vs original.
-- **OCR missing or failed:** falls back to full-sheet vector DXF with a warning.
-- **No lines detected:** empty/minimal DXF + manifest warning.
-- **OCR but no regex matches:** single vector DXF; suggests tuning `--part-regex`.
-- **Duplicate part IDs from OCR:** one label box kept per ID for linking.
-- **PDF page out of range:** clear `FileNotFoundError` from loader.
-
----
-
-## Limitations (expect tuning)
-
-- **Linking is heuristic:** overlapping callouts, long members, and shared lines can be assigned to the wrong part or `UNASSIGNED`.
-- **Vectorization:** dashed lines, thick ink, and scanning noise fragment or duplicate geometry.
-- **Scale:** default `1 mm` per pixel is arbitrary; set `--mm-per-pixel` from a known dimension on the sheet.
-- **First EasyOCR run:** downloads models; can be slow and large.
-
----
-
-## Interview / demo narrative
-
-1. **Problem:** raster/PDF → structured CAD for downstream part detailing.  
-2. **Approach:** classical CV for primitives + OCR for labels + **explicit intermediate representation** (segments + manifest) before DXF.  
-3. **Production:** add human review UI, CAD templates, and better association (graph / learning) between leaders and geometry.
-
----
 
 ## License
 
-Use and modify for your interview or internal work; add a license file if you redistribute.
+Use and modify for interview or internal work; add a license if you redistribute.

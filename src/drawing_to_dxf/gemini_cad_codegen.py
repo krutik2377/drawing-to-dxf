@@ -39,6 +39,11 @@ Return ONLY valid JSON (no markdown fences, no commentary). Shape:
 
 Split across several inner objects if needed; merge all key/value pairs logically.
 
+**CRITICAL — stay within output token limits:** The whole answer is one JSON blob; long Python strings get truncated and break parsing. Each part's program must be **terse executable code only**:
+- **No design narrative, no "re-interpreting" paragraphs, no duplicate explanations** inside the source strings. At most a few one-line `#` notes (datum, EST dims).
+- Target **roughly 80–160 lines per part**; use lists/loops for repeated holes, not copy-paste blocks.
+- Prefer simpler outlines (lines/circles/LWPolylines) over essay-length comments. **You must emit complete, valid JSON** with every string closed and final `]` present.
+
 **Component count (required):** **Target 5–8 top-level JSON keys** (each key = one DXF script). **Never output more than 8.** Aim for **at least 5** whenever the drawing has enough distinct callouts/details/BOM cut items (see bullets below); count separate items as separate keys unless identical multiples are explicit (then one key + QTY in ANNOTATION).
 
 ---
@@ -255,6 +260,65 @@ def merge_dxfs_horizontal(
     dst.saveas(str(out_path))
 
 
+def merge_dxfs_grid(
+    labeled_paths: list[tuple[str, Path]],
+    out_path: Path,
+    *,
+    gap_mm: float = 40.0,
+    ncols: int = 3,
+) -> None:
+    """Append each DXF's MODELSPACE into a new document, tiling in rows of ``ncols`` along +X, next row −Y."""
+    if ncols < 1:
+        ncols = 1
+    dst = ezdxf.new("R2010", setup=True)
+    dst.units = ezdxf.units.MM
+    cursor_x = 0.0
+    current_row_y = 0.0
+    row_max_h = 0.0
+
+    for idx, (_label, src_path) in enumerate(labeled_paths):
+        if not src_path.is_file():
+            continue
+        col = idx % ncols
+        if col == 0 and idx > 0:
+            current_row_y -= row_max_h + float(gap_mm)
+            cursor_x = 0.0
+            row_max_h = 0.0
+        try:
+            src = ezdxf.readfile(str(src_path))
+        except Exception:
+            continue
+        msp_src = src.modelspace()
+        try:
+            ext = bbox.extents(msp_src)
+            min_x = float(ext.extmin.x) if ext.has_data else 0.0
+            min_y = float(ext.extmin.y) if ext.has_data else 0.0
+            width = float(ext.size.x) if ext.has_data else 80.0
+            height = float(ext.size.y) if ext.has_data else 80.0
+        except Exception:
+            min_x, min_y = 0.0, 0.0
+            width, height = 80.0, 80.0
+
+        n_before = len(list(dst.modelspace()))
+        try:
+            Importer(src, dst).import_modelspace()
+        except Exception:
+            continue
+        ents = list(dst.modelspace())[n_before:]
+        tx = cursor_x - min_x
+        ty = current_row_y - min_y
+        for e in ents:
+            try:
+                e.transform(Matrix44.translate(tx, ty, 0.0))
+            except Exception:
+                continue
+        cursor_x += max(width, 1.0) + float(gap_mm)
+        row_max_h = max(row_max_h, max(height, 1.0))
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    dst.saveas(str(out_path))
+
+
 @dataclass
 class GeminiCadCodegenConfig:
     input_path: Path
@@ -264,9 +328,13 @@ class GeminiCadCodegenConfig:
     pdf_dpi: float = 150.0
     max_side: int = 2048
     layout_gap_mm: float = 40.0
+    assembly_layout: str = "horizontal"
+    grid_columns: int = 3
     script_timeout_s: float = 90.0
     gemini_timeout_s: float = 600.0
     gemini_max_output_tokens: int = 65536
+    sheet_report: bool = False
+    sheet_gemini_max_output_tokens: int = 8192
 
 
 @dataclass
@@ -278,6 +346,9 @@ class GeminiCadCodegenResult:
     component_dxfs: dict[str, Path] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     script_errors: dict[str, str] = field(default_factory=dict)
+    component_sheet_json: Path | None = None
+    component_sheet_markdown: Path | None = None
+    component_sheet_warnings: list[str] = field(default_factory=list)
 
 
 def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResult:
@@ -286,9 +357,39 @@ def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResul
     stem = cfg.input_path.stem
     warnings: list[str] = []
     script_errors: dict[str, str] = {}
+    sheet_json_path: Path | None = None
+    sheet_md_path: Path | None = None
+    sheet_warnings: list[str] = []
 
     bgr = _load_input_bgr(cfg.input_path, pdf_page=cfg.pdf_page, pdf_dpi=cfg.pdf_dpi)
     png_bytes = _bgr_to_png_bytes(bgr, cfg.max_side)
+
+    if cfg.sheet_report:
+        from drawing_to_dxf.component_sheet_report import (
+            ComponentSheetExtractConfig,
+            run_component_sheet_extract,
+        )
+
+        try:
+            ser = run_component_sheet_extract(
+                ComponentSheetExtractConfig(
+                    input_path=cfg.input_path,
+                    output_dir=cfg.output_dir,
+                    gemini_model=cfg.gemini_model,
+                    pdf_page=cfg.pdf_page,
+                    pdf_dpi=cfg.pdf_dpi,
+                    max_side=cfg.max_side,
+                    gemini_timeout_s=cfg.gemini_timeout_s,
+                    gemini_max_output_tokens=cfg.sheet_gemini_max_output_tokens,
+                )
+            )
+            sheet_json_path = ser.json_path
+            sheet_md_path = ser.markdown_path
+            sheet_warnings = list(ser.warnings)
+            for sw in sheet_warnings:
+                warnings.append(f"Sheet report: {sw}")
+        except Exception as e:
+            warnings.append(f"Sheet report failed: {e}")
 
     raw_text = call_gemini_generate_content_raw(
         api_key=api_key,
@@ -311,6 +412,13 @@ def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResul
             "warnings": warnings,
             "raw_text_path": str(raw_path.resolve()),
             "components": {},
+            "assembly_layout": cfg.assembly_layout,
+            "grid_columns": cfg.grid_columns,
+            "component_sheet": {
+                "json": str(sheet_json_path.resolve()) if sheet_json_path else None,
+                "markdown": str(sheet_md_path.resolve()) if sheet_md_path else None,
+                "warnings": sheet_warnings,
+            },
         }
         mp = cfg.output_dir / f"{stem}_gemini_codegen_manifest.json"
         mp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -319,6 +427,9 @@ def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResul
             assembly_dxf=None,
             raw_model_text_path=raw_path,
             warnings=warnings,
+            component_sheet_json=sheet_json_path,
+            component_sheet_markdown=sheet_md_path,
+            component_sheet_warnings=sheet_warnings,
         )
 
     n_comp = len(components)
@@ -376,7 +487,16 @@ def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResul
         ordered = [(k, dxf_paths[k]) for k in components if k in dxf_paths]
         assembly = cfg.output_dir / f"{stem}_gemini_codegen_assembly.dxf"
         try:
-            merge_dxfs_horizontal(ordered, assembly, gap_mm=cfg.layout_gap_mm)
+            lay = (cfg.assembly_layout or "horizontal").strip().lower()
+            if lay == "grid":
+                merge_dxfs_grid(
+                    ordered,
+                    assembly,
+                    gap_mm=cfg.layout_gap_mm,
+                    ncols=int(cfg.grid_columns),
+                )
+            else:
+                merge_dxfs_horizontal(ordered, assembly, gap_mm=cfg.layout_gap_mm)
         except Exception as e:
             warnings.append(f"Assembly merge failed: {e}")
             assembly = None
@@ -393,6 +513,13 @@ def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResul
         "dxfs": {k: str(v.resolve()) for k, v in dxf_paths.items()},
         "script_errors": script_errors,
         "assembly_dxf": str(assembly.resolve()) if assembly else None,
+        "assembly_layout": cfg.assembly_layout,
+        "grid_columns": cfg.grid_columns,
+        "component_sheet": {
+            "json": str(sheet_json_path.resolve()) if sheet_json_path else None,
+            "markdown": str(sheet_md_path.resolve()) if sheet_md_path else None,
+            "warnings": sheet_warnings,
+        },
     }
     mp = cfg.output_dir / f"{stem}_gemini_codegen_manifest.json"
     mp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -405,4 +532,7 @@ def run_gemini_cad_codegen(cfg: GeminiCadCodegenConfig) -> GeminiCadCodegenResul
         component_dxfs=dxf_paths,
         warnings=warnings,
         script_errors=script_errors,
+        component_sheet_json=sheet_json_path,
+        component_sheet_markdown=sheet_md_path,
+        component_sheet_warnings=sheet_warnings,
     )

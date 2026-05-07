@@ -1,0 +1,249 @@
+{
+  "sheet_title": "Tower Section Assembly",
+  "drawing_number": null,
+  "scale_note": "BZ: 300mm/m",
+  "revision": null,
+  "date_drawn": null,
+  "components": [
+    {
+      "item_index": "713",
+      "name": "LEG (L 150x15)",
+      "views": [
+        "elevation",
+        "right elevation"
+      ],
+      "dimension_callouts": [
+        {
+          "description": "Overall height of section",
+          "value": "8605.5",
+          "unit": "mm"
+        },
+        {
+          "description": "Section height 1",
+          "value": "700",
+          "unit": "mm"
+        },
+        {
+          "description": "Section height 2",
+          "value": "3540",
+          "unit": "mm"
+        },
+        {
+          "description": "Section height 3",
+          "value": "3860",
+          "unit": "mm"
+        },
+        {
+          "description": "Section height 4",
+          "value": "1400",
+          "unit": "mm"
+        },
+        {
+          "description": "Section height 5",
+          "value": "500",
+          "unit": "mm"
+        },
+        {
+          "description": "Angle",
+          "value": "49.9",
+          "unit": null
+        }
+      ],
+      "holes_and_features": "Holes for M24x75, M27x85, M20x50, M20x45, M20x60, M20x55, M20x40 bolts",
+      "summary_table": {
+        "SECTION": "L 150x15"
+      }
+    },
+    {
+      "item_index": "701",
+      "name": "DIAGONAL (L 90x9)",
+      "views": [
+        "elevation",
+        "detail view"
+      ],
+      "dimension_callouts": [
+        {
+          "description": "Angle",
+          "value": "49.9",
+          "unit": null
+        },
+        {
+          "description": "Detail length 1",
+          "value": "125",
+          "unit": "mm"
+        },
+        {
+          "description": "Detail length 2",
+          "value": "125",
+          "unit": "mm"
+        },
+        {
+          "description": "Detail length 3",
+          "value": "300",
+          "unit": "mm"
+        },
+        {
+          "description": "Detail length 4",
+          "value": "477",
+          "unit": "mm"
+        },
+        {
+          "description": "Detail length 5",
+          "value": "50",
+          "unit": "mm"
+        },
+        {
+          "description": "Detail length 6",
+          "value": "375",
+          "unit": "mm"
+        },
+        {
+          "description": "Radius 1",
+          "value": "R12",
+          "unit": "mm"
+        },
+        {
+          "description": "Radius 2",
+          "value": "R10",
+          "unit": "mm"
+        }
+      ],
+      "holes_and_features": "Holes for M24x75, M27x85 bolts",
+      "summary_table": {
+        "SECTION": "L 90x9"
+      }
+    },
+    {
+      "item_index": "711",
+      "name": "HORIZONTAL (L 110x10)",
+      "views": [
+        "elevation"
+      ],
+      "dimension_callouts": [],
+      "holes_and_features": "Holes for M24x75, M27x85 bolts",
+      "summary_table": {
+        "SECTION": "L 110x10"
+      }
+    },
+    {
+      "item_index": "714",
+      "name": "HORIZONTAL (L 150x15)",
+      "views": [
+        "elevation"
+      ],
+      "dimension_callouts": [],
+      "holes_and_features": "Holes for M27x85 bolts",
+      "summary_table": {
+        "SECTION": "L 150x15"
+      }
+    },
+    {
+      "item_index": "730",
+      "name": "PLATE (BLE 15x236)",
+      "views": [
+        "elevation",
+        "section A-A"
+      ],
+      "dimension_callouts": [
+        {
+          "description": "Thickness",
+          "value": "15",
+          "unit": "mm"
+        },
+        {
+          "description": "Width",
+          "value": "236",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A width",
+          "value": "250",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A dimension 1",
+          "value": "125",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A dimension 2",
+          "value": "125",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A dimension 3",
+          "value": "72",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A dimension 4",
+          "value": "72",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A dimension 5",
+          "value": "128",
+          "unit": "mm"
+        },
+        {
+          "description": "Section A-A dimension 6",
+          "value": "128",
+          "unit": "mm"
+        }
+      ],
+      "holes_and_features": "Holes for M24x75, M20x50, M20x45, M20x60, M20x55, M20x40 bolts",
+      "summary_table": {
+        "SECTION": "BLE 15x236",
+        "THICKNESS": "15"
+      }
+    },
+    {
+      "item_index": "732",
+      "name": "PLATE (BLE 20x80)",
+      "views": [
+        "elevation"
+      ],
+      "dimension_callouts": [
+        {
+          "description": "Thickness",
+          "value": "20",
+          "unit": "mm"
+        },
+        {
+          "description": "Width",
+          "value": "80",
+          "unit": "mm"
+        }
+      ],
+      "holes_and_features": "Holes for M20x50, M20x45, M20x60, M20x55, M20x40 bolts",
+      "summary_table": {
+        "SECTION": "BLE 20x80",
+        "THICKNESS": "20"
+      }
+    },
+    {
+      "item_index": "729",
+      "name": "PLATE (BLE 20x150)",
+      "views": [
+        "elevation"
+      ],
+      "dimension_callouts": [
+        {
+          "description": "Thickness",
+          "value": "20",
+          "unit": "mm"
+        },
+        {
+          "description": "Width",
+          "value": "150",
+          "unit": "mm"
+        }
+      ],
+      "holes_and_features": "Holes for M24x75, M27x85, M20x50, M20x45, M20x60, M20x55, M20x40 bolts",
+      "summary_table": {
+        "SECTION": "BLE 20x150",
+        "THICKNESS": "20"
+      }
+    }
+  ]
+}
