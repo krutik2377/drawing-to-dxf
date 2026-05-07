@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from math import hypot
-from typing import DefaultDict, MutableMapping, Sequence
+from typing import Any, DefaultDict, MutableMapping, Sequence
 
 import cv2
 import numpy as np
@@ -19,7 +19,13 @@ from drawing_to_dxf.geometry_intel import (
 from drawing_to_dxf.ocr_extract import TextBox
 from drawing_to_dxf.segment_types import Segment
 from drawing_to_dxf.skeleton_vectorize import prepare_masked_gray
+from drawing_to_dxf.constraint_heal import apply_constraint_heal
+from drawing_to_dxf.engineering_intel_passes import (
+    apply_engineering_intelligence_vector_stage,
+    topology_intel_on_exploded_segments,
+)
 from drawing_to_dxf.topology_clean import refine_vector_drawing
+from drawing_to_dxf.topology_repair import repair_exploded_segments
 from drawing_to_dxf.vector_fit import apply_polyline_fittings
 
 
@@ -33,21 +39,43 @@ def extract_skeleton_vector_bundle(
     collinear_merge_angle_deg: float = 5.0,
     polyline_rdp_epsilon_px: float = 1.5,
     annotation_pad_px: float = 5.0,
+    annotation_box_shrink_from_pad_px: float = 0.0,
     enable_circles: bool = True,
     mask_text_interior_only: bool = False,
     soft_ink_mask: bool = False,
-    enable_topology_clean: bool = True,
+    enable_topology_clean: bool = False,
     enable_arc_fitting: bool = False,
     enable_loop_circle_fit: bool = False,
     lsd_supplement: bool = False,
     lsd_min_length_px: float | None = None,
     geometry_bridge_gap_px: float = 0.0,
     dedupe_residual_segments: bool = True,
+    enable_topology_segment_repair: bool = False,
+    topology_max_bridge_gap_px: float | None = None,
+    topology_junction_snap_px: float = 3.0,
+    topology_bridge_direction_dot_min: float = 0.42,
+    topology_repair_metrics: MutableMapping[str, int] | None = None,
     debug_stages: MutableMapping[str, np.ndarray] | None = None,
+    engineering_layout: bool = False,
+    ruling_suppress_strength: float | None = None,
+    multi_scale_ink: bool = False,
+    protect_hole_rings: bool = True,
+    enable_constraint_heal: bool = False,
+    constraint_orthogonal_quad_corner_tol_deg: float = 14.0,
+    complete_full_arcs_to_circles_min_span_deg: float | None = None,
+    enable_engineering_intel_passes: bool = False,
+    engineering_intel_metrics: MutableMapping[str, Any] | None = None,
+    topology_intersection_extend_px: float = 0.0,
+    enable_cad_axis_regularization: bool = False,
+    enable_healed_vector_export: bool = False,
 ) -> tuple[VectorDrawing, list[Segment]]:
     """Skeleton-graph vectorization (+ optional OCR masks) packaged with exploded segments for OCR linking."""
     if gray.ndim != 2:
         raise ValueError("grayscale expected")
+
+    intel_sink: MutableMapping[str, Any] = (
+        engineering_intel_metrics if engineering_intel_metrics is not None else {}
+    )
 
     from drawing_to_dxf.skeleton_vectorize import extract_vector_drawing as _extract_vd
 
@@ -57,22 +85,42 @@ def extract_skeleton_vector_bundle(
         gray,
         annotation_boxes=boxes_arg if boxes_arg else None,
         annotation_pad_px=float(annotation_pad_px),
+        annotation_box_shrink_from_pad_px=float(annotation_box_shrink_from_pad_px),
         min_skeleton_branch_px=max(12, min(160, min_line_length)),
         rdp_tolerance_px=max(0.4, polyline_rdp_epsilon_px),
         enable_circles=enable_circles,
         mask_text_interior_only=mask_text_interior_only,
         soft_ink_mask=soft_ink_mask,
+        engineering_layout=engineering_layout,
+        ruling_suppress_strength=ruling_suppress_strength,
+        multi_scale_ink=multi_scale_ink,
+        protect_hole_rings=protect_hole_rings,
         debug_stages=debug_stages,
     )
     mb_px = float(max(12, min(160, min_line_length)))
 
     if enable_topology_clean:
         vd = refine_vector_drawing(vd, min_branch_px=mb_px)
-    if enable_arc_fitting or enable_loop_circle_fit:
+    if enable_arc_fitting or enable_loop_circle_fit or complete_full_arcs_to_circles_min_span_deg is not None:
         vd = apply_polyline_fittings(
             vd,
             fit_arcs=enable_arc_fitting,
             fit_circles_from_loops=enable_loop_circle_fit,
+            complete_full_arcs_to_circles_min_span_deg=complete_full_arcs_to_circles_min_span_deg,
+        )
+
+    if enable_constraint_heal:
+        vd = apply_constraint_heal(
+            vd,
+            orthogonal_quads=True,
+            corner_tol_deg=float(constraint_orthogonal_quad_corner_tol_deg),
+        )
+
+    if enable_engineering_intel_passes:
+        vd = apply_engineering_intelligence_vector_stage(
+            vd,
+            ocr_boxes=list(annotation_boxes) if annotation_boxes else None,
+            metrics=intel_sink,
         )
 
     if geometry_bridge_gap_px > 0:
@@ -83,6 +131,7 @@ def extract_skeleton_vector_bundle(
             gray,
             annotation_boxes=boxes_arg if boxes_arg else None,
             annotation_pad_px=float(annotation_pad_px),
+            annotation_box_shrink_from_pad_px=float(annotation_box_shrink_from_pad_px),
             mask_text_interior_only=mask_text_interior_only,
         )
         lsd_floor = float(lsd_min_length_px) if lsd_min_length_px is not None else float(max(min_line_length, 10))
@@ -112,6 +161,46 @@ def extract_skeleton_vector_bundle(
     sq = float(min_line_length * min_line_length)
     segs = [s for s in segs_raw if hypot(s.x2 - s.x1, s.y2 - s.y1) >= min_line_length * 0.85]
 
+    if enable_topology_segment_repair and segs:
+        auto_bridge = (
+            topology_max_bridge_gap_px
+            if topology_max_bridge_gap_px is not None
+            else max(4.0, float(merge_distance) * 1.15)
+        )
+        repair_merge_d = float(merge_distance) if merge_distance > 0 else 2.0
+        segs = repair_exploded_segments(
+            segs,
+            merge_distance=repair_merge_d,
+            max_bridge_gap_px=float(auto_bridge),
+            junction_snap_px=float(topology_junction_snap_px),
+            bridge_direction_dot_min=float(topology_bridge_direction_dot_min),
+            intersection_extend_px=float(topology_intersection_extend_px),
+            stats=None,
+            manifest_metrics=topology_repair_metrics,
+        )
+
+    if enable_cad_axis_regularization and segs:
+        from drawing_to_dxf.constraint_heal import (
+            align_parallel_residual_clusters,
+            snap_axis_aligned_residual_segments,
+        )
+
+        segs, n_ax = snap_axis_aligned_residual_segments(
+            segs,
+            angle_tol_deg=2.85,
+            min_length_px=max(8.0, float(min_line_length) * 0.55),
+        )
+        segs, n_pr = align_parallel_residual_clusters(
+            segs,
+            angle_tol_deg=2.35,
+            offset_snap_px=max(1.5, float(merge_distance) * 0.4),
+            min_cluster_size=3,
+            min_length_px=max(22.0, float(min_line_length) * 1.05),
+        )
+        if topology_repair_metrics is not None:
+            topology_repair_metrics["axis_snap_residuals"] = int(n_ax)
+            topology_repair_metrics["parallel_cluster_snaps"] = int(n_pr)
+
     if merge_distance > 0 and segs:
         segs = _merge_close_endpoints(segs, merge_distance)
     snap_for_refinement = merge_distance if merge_distance > 0 else 2.0
@@ -123,7 +212,14 @@ def extract_skeleton_vector_bundle(
     for s in segs:
         if hypot(s.x2 - s.x1, s.y2 - s.y1) * hypot(s.x2 - s.x1, s.y2 - s.y1) >= sq * 0.25:
             trimmed.append(s)
-    return vd, trimmed if trimmed else segs_raw
+    out_segs = trimmed if trimmed else segs_raw
+    if enable_engineering_intel_passes:
+        topology_intel_on_exploded_segments(out_segs, intel_sink)
+    if enable_healed_vector_export and out_segs:
+        from drawing_to_dxf.cad_geometry_rebuild import vector_drawing_from_healed_segments
+
+        vd = vector_drawing_from_healed_segments(vd, out_segs)
+    return vd, out_segs
 
 
 def _legacy_hough_extract_segments(
@@ -204,6 +300,7 @@ def extract_segments(
     annotation_boxes: Sequence[TextBox] | None = None,
     mask_annotation_regions: bool = True,
     annotation_pad_px: float = 10.0,
+    annotation_box_shrink_from_pad_px: float = 0.0,
     enable_circles: bool = True,
     mask_text_interior_only: bool = False,
     soft_ink_mask: bool = False,
@@ -214,6 +311,23 @@ def extract_segments(
     lsd_min_length_px: float | None = None,
     geometry_bridge_gap_px: float = 0.0,
     dedupe_residual_segments: bool = True,
+    enable_topology_segment_repair: bool = False,
+    topology_max_bridge_gap_px: float | None = None,
+    topology_junction_snap_px: float = 3.0,
+    topology_bridge_direction_dot_min: float = 0.42,
+    topology_repair_metrics: MutableMapping[str, int] | None = None,
+    engineering_layout: bool = False,
+    ruling_suppress_strength: float | None = None,
+    multi_scale_ink: bool = False,
+    protect_hole_rings: bool = True,
+    enable_constraint_heal: bool = False,
+    constraint_orthogonal_quad_corner_tol_deg: float = 14.0,
+    complete_full_arcs_to_circles_min_span_deg: float | None = None,
+    enable_engineering_intel_passes: bool = False,
+    engineering_intel_metrics: MutableMapping[str, Any] | None = None,
+    topology_intersection_extend_px: float = 0.0,
+    enable_cad_axis_regularization: bool = False,
+    enable_healed_vector_export: bool = False,
 ) -> list[Segment]:
     """Primary path: OCR-mask aware skeleton-graph tracing (:mod:`drawing_to_dxf.skeleton_vectorize`)."""
     _ = canny1, canny2, hough_threshold, max_line_gap  # legacy kwargs retained for callers/tests
@@ -240,6 +354,7 @@ def extract_segments(
         collinear_merge_angle_deg=collinear_merge_angle_deg,
         polyline_rdp_epsilon_px=polyline_rdp_epsilon_px,
         annotation_pad_px=annotation_pad_px,
+        annotation_box_shrink_from_pad_px=annotation_box_shrink_from_pad_px,
         enable_circles=enable_circles,
         mask_text_interior_only=mask_text_interior_only,
         soft_ink_mask=soft_ink_mask,
@@ -250,6 +365,23 @@ def extract_segments(
         lsd_min_length_px=lsd_min_length_px,
         geometry_bridge_gap_px=geometry_bridge_gap_px,
         dedupe_residual_segments=dedupe_residual_segments,
+        enable_topology_segment_repair=enable_topology_segment_repair,
+        topology_max_bridge_gap_px=topology_max_bridge_gap_px,
+        topology_junction_snap_px=topology_junction_snap_px,
+        topology_bridge_direction_dot_min=topology_bridge_direction_dot_min,
+        topology_repair_metrics=topology_repair_metrics,
+        engineering_layout=engineering_layout,
+        ruling_suppress_strength=ruling_suppress_strength,
+        multi_scale_ink=multi_scale_ink,
+        protect_hole_rings=protect_hole_rings,
+        enable_constraint_heal=enable_constraint_heal,
+        constraint_orthogonal_quad_corner_tol_deg=constraint_orthogonal_quad_corner_tol_deg,
+        complete_full_arcs_to_circles_min_span_deg=complete_full_arcs_to_circles_min_span_deg,
+        enable_engineering_intel_passes=enable_engineering_intel_passes,
+        engineering_intel_metrics=engineering_intel_metrics,
+        topology_intersection_extend_px=topology_intersection_extend_px,
+        enable_cad_axis_regularization=enable_cad_axis_regularization,
+        enable_healed_vector_export=enable_healed_vector_export,
     )
     return sg
 

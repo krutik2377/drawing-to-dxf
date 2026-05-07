@@ -25,6 +25,7 @@ def prepare_masked_gray(
     *,
     annotation_boxes: Sequence[TextBox] | None,
     annotation_pad_px: float = 5.0,
+    annotation_box_shrink_from_pad_px: float = 0.0,
     mask_text_interior_only: bool = False,
 ) -> np.ndarray:
     """Grayscale after OCR masking (same prep as :func:`extract_vector_drawing`)."""
@@ -34,10 +35,18 @@ def prepare_masked_gray(
     if annotation_boxes:
         if mask_text_interior_only:
             masked_gray = apply_text_masks_interior_only(
-                masked_gray, annotation_boxes, pad_px=annotation_pad_px
+                masked_gray,
+                annotation_boxes,
+                pad_px=annotation_pad_px,
+                box_shrink_from_pad_px=annotation_box_shrink_from_pad_px,
             )
         else:
-            masked_gray = apply_text_masks(masked_gray, annotation_boxes, pad_px=annotation_pad_px)
+            masked_gray = apply_text_masks(
+                masked_gray,
+                annotation_boxes,
+                pad_px=annotation_pad_px,
+                box_shrink_from_pad_px=annotation_box_shrink_from_pad_px,
+            )
     return masked_gray
 
 
@@ -280,6 +289,28 @@ def _supplement_circles_from_round_ink_blobs(
     return [c for _s, c in scored[:max_add]]
 
 
+def _ring_protection_mask(
+    shape: tuple[int, ...],
+    circles: Sequence[CircleDef],
+    *,
+    band_px: int = 4,
+) -> np.ndarray:
+    """Foreground band on circle rims so remove_small_objects is less likely to drop hole strokes."""
+    h, w = int(shape[0]), int(shape[1])
+    m = np.zeros((h, w), dtype=bool)
+    if not circles:
+        return m
+    t = max(2, int(band_px))
+    overlay = np.zeros((h, w), dtype=np.uint8)
+    for c in circles:
+        rr = int(round(float(c.r)))
+        if rr < 2:
+            continue
+        ix, iy = int(round(c.cx)), int(round(c.cy))
+        cv2.circle(overlay, (ix, iy), rr, 255, thickness=t, lineType=cv2.LINE_AA)
+    return overlay > 0
+
+
 def _erase_circumference_rings(binary_ink_255: np.ndarray, circles: Sequence[CircleDef]) -> np.ndarray:
     """Zero-out circumference bands so skeletonization does not re-trace circles."""
     out = binary_ink_255.copy()
@@ -322,11 +353,18 @@ def extract_vector_drawing(
     *,
     annotation_boxes: Sequence[TextBox] | None,
     annotation_pad_px: float = 5.0,
+    annotation_box_shrink_from_pad_px: float = 0.0,
     min_skeleton_branch_px: int = 28,
     rdp_tolerance_px: float = 2.25,
     enable_circles: bool = True,
     mask_text_interior_only: bool = False,
     soft_ink_mask: bool = False,
+    engineering_layout: bool = False,
+    ruling_suppress_strength: float | None = None,
+    multi_scale_ink: bool = False,
+    protect_hole_rings: bool = True,
+    thresh_block: int = 31,
+    thresh_c: int = 7,
     debug_stages: MutableMapping[str, np.ndarray] | None = None,
 ) -> VectorDrawing:
     """
@@ -338,6 +376,10 @@ def extract_vector_drawing(
 
     ``soft_ink_mask=True`` skips horizontal dimension-line suppression ahead of adaptive threshold.
 
+    ``engineering_layout=True`` uses milder ruling suppression when horizontal cleaning is enabled.
+
+    ``multi_scale_ink=True`` fuses a second adaptive-threshold pass to recover thin strokes.
+
     ``debug_stages`` optional dict filled with debug image arrays (masked gray ``uint8``, binary/skeleton masks).
     """
     if gray.ndim != 2:
@@ -347,10 +389,38 @@ def extract_vector_drawing(
         gray,
         annotation_boxes=annotation_boxes,
         annotation_pad_px=annotation_pad_px,
+        annotation_box_shrink_from_pad_px=annotation_box_shrink_from_pad_px,
         mask_text_interior_only=mask_text_interior_only,
     )
 
-    ink = inks_mask_from_gray(masked_gray, suppress_ruling_lines=not soft_ink_mask)
+    if soft_ink_mask:
+        suppress_ruling = False
+        rs_eff = 1.0
+    else:
+        suppress_ruling = True
+        if ruling_suppress_strength is not None:
+            rs_eff = float(ruling_suppress_strength)
+        else:
+            rs_eff = 0.4 if engineering_layout else 1.0
+
+    tb = max(7, int(thresh_block) | 1)
+    tc = int(thresh_c)
+    ink = inks_mask_from_gray(
+        masked_gray,
+        thresh_block=tb,
+        thresh_c=tc,
+        suppress_ruling_lines=suppress_ruling,
+        ruling_suppress_strength=rs_eff,
+    )
+    if multi_scale_ink:
+        ink_b = inks_mask_from_gray(
+            masked_gray,
+            thresh_block=min(55, tb + 8),
+            thresh_c=max(2, tc - 2),
+            suppress_ruling_lines=suppress_ruling,
+            ruling_suppress_strength=rs_eff,
+        )
+        ink = np.maximum(ink, ink_b)
 
     circles: list[CircleDef] = []
     if enable_circles:
@@ -362,14 +432,19 @@ def extract_vector_drawing(
 
     ink = _erase_circumference_rings(ink, circles)
 
-    fg = ink > 0
+    pre_fg = ink > 0
     min_keep_px = max(48, int(min_skeleton_branch_px) * 8)
-    fg = remove_small_objects(fg, min_size=min_keep_px, connectivity=2)
-    sk_bool = skeletonize(fg.astype(bool))
+    fg_kept = remove_small_objects(pre_fg, min_size=min_keep_px, connectivity=2)
+    if protect_hole_rings and circles and enable_circles:
+        prot = _ring_protection_mask(ink.shape, circles, band_px=4)
+        fg_kept = fg_kept | (prot & pre_fg)
+
+    sk_bool = skeletonize(fg_kept.astype(bool))
 
     if debug_stages is not None:
         debug_stages["masked_gray"] = masked_gray
         debug_stages["binary_ink"] = ink
+        debug_stages["foreground_after_prune"] = (fg_kept.astype(np.uint8)) * np.uint8(255)
         debug_stages["skeleton_bool"] = (sk_bool.astype(np.uint8)) * np.uint8(255)
 
     raw_paths_xy, closes = trace_skeleton_polylines(sk_bool)

@@ -1,0 +1,236 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 0,
+        "length_px": 23.89967260642798
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            25.0,
+            89.0
+          ],
+          [
+            34.88416666666667,
+            67.24000000000001
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 1,
+        "length_px": 163.27083333333331
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            37.72916666666667,
+            38.6875
+          ],
+          [
+            201.0,
+            38.6875
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 2,
+        "length_px": 28.55250000000001
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            37.72916666666667,
+            38.6875
+          ],
+          [
+            37.72916666666667,
+            67.24000000000001
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 3,
+        "length_px": 105.44526455096276
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            99.7407107123002,
+            35.38791931006389
+          ],
+          [
+            204.27083333333334,
+            49.25
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 4,
+        "length_px": 23.5
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            40.0,
+            116.0
+          ],
+          [
+            40.0,
+            92.5
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 5,
+        "length_px": 25.789512093635608
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            40.083333333333336,
+            92.5
+          ],
+          [
+            34.88416666666667,
+            67.24000000000001
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 6,
+        "length_px": 56.11583333333333
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            34.88416666666667,
+            67.24000000000001
+          ],
+          [
+            91.0,
+            67.24000000000001
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 7,
+        "length_px": 83.46180555555556
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            204.27083333333334,
+            49.25
+          ],
+          [
+            204.27083333333334,
+            132.71180555555554
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 8,
+        "length_px": 115.51736111111113
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            204.35069444444446,
+            132.71180555555554
+          ],
+          [
+            88.83333333333333,
+            132.71180555555554
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 9,
+        "length_px": 141.62754246822996
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            204.27083333333334,
+            49.25
+          ],
+          [
+            88.83333333333333,
+            131.30208333333334
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_04",
+        "id": 10,
+        "length_px": 28.302083333333336
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            86.0,
+            103.0
+          ],
+          [
+            86.0,
+            131.30208333333334
+          ]
+        ]
+      }
+    }
+  ]
+}

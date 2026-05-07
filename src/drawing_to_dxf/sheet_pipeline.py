@@ -14,12 +14,18 @@ import numpy as np
 from drawing_to_dxf.ai_structured import (
     AIExtractResult,
     build_user_prompt,
+    call_gemini_generate_content,
     call_ollama_chat,
     call_openai_compatible,
 )
 from drawing_to_dxf.ocr_extract import extract_text_boxes
 from drawing_to_dxf.panel_split import split_panels
 from drawing_to_dxf.preprocess import load_image_bgr, load_pdf_page_as_bgr, preprocess
+from drawing_to_dxf.raster_pipeline_flow import (
+    engineering_intelligence_manifest_rows,
+    pipeline_flow_manifest_rows,
+)
+from drawing_to_dxf.reconstruction_roadmap import reconstruction_roadmap_manifest_rows
 from drawing_to_dxf.render_layout import PanelTile, render_composite_png
 
 
@@ -57,12 +63,14 @@ class SheetRunConfig:
     panel_min_area: int = 15_000
     panel_min_gap: int = 48
     ocr_gpu: bool = False
-    ai_provider: str = "none"  # none | ollama | openai
+    ai_provider: str = "none"  # none | ollama | openai | gemini
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     ollama_host: str = "http://127.0.0.1:11434"
     ollama_model: str = "llava"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
     layout_cols: int | None = None
 
 
@@ -112,6 +120,11 @@ def run_sheet(cfg: SheetRunConfig) -> SheetRunResult:
     api_key = cfg.openai_api_key or os.environ.get("OPENAI_API_KEY", "")
     base_url = os.environ.get("OPENAI_BASE_URL", cfg.openai_base_url)
     ollama_host = os.environ.get("OLLAMA_HOST", cfg.ollama_host)
+    gemini_key = (
+        cfg.gemini_api_key
+        or os.environ.get("GEMINI_API_KEY", "")
+        or os.environ.get("GOOGLE_API_KEY", "")
+    )
 
     for i, (x, y, w, h) in enumerate(boxes):
         crop_bgr = pre.gray[y : y + h, x : x + w]
@@ -149,8 +162,24 @@ def run_sheet(cfg: SheetRunConfig) -> SheetRunResult:
                 ai_json = res.data
             except Exception as e:  # noqa: BLE001
                 ai_err = f"{type(e).__name__}: {e}"
+        elif cfg.ai_provider == "gemini":
+            if not gemini_key:
+                ai_err = "GEMINI_API_KEY or GOOGLE_API_KEY missing"
+            else:
+                try:
+                    res = call_gemini_generate_content(
+                        api_key=gemini_key,
+                        model=cfg.gemini_model,
+                        png_bytes=png_bytes,
+                        user_prompt=build_user_prompt(ocr_ctx),
+                    )
+                    ai_json = res.data
+                except Exception as e:  # noqa: BLE001
+                    ai_err = f"{type(e).__name__}: {e}"
         elif cfg.ai_provider != "none":
-            warnings.append(f"Unknown ai_provider {cfg.ai_provider!r}; use none|openai|ollama")
+            warnings.append(
+                f"Unknown ai_provider {cfg.ai_provider!r}; use none|openai|ollama|gemini"
+            )
 
         if ai_err:
             warnings.append(f"Panel {i}: AI skipped/failed: {ai_err}")
@@ -174,6 +203,9 @@ def run_sheet(cfg: SheetRunConfig) -> SheetRunResult:
     manifest_path = out / f"{stem}_sheet_manifest.json"
     manifest = {
         "version": 1,
+        "pipeline_flow": pipeline_flow_manifest_rows(),
+        "engineering_intelligence_layers": engineering_intelligence_manifest_rows(),
+        "reconstruction_roadmap": reconstruction_roadmap_manifest_rows(),
         "input": str(cfg.input_path.resolve()),
         "processed_size_px": {
             "width": int(pre.gray.shape[1]),

@@ -1,0 +1,173 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 0,
+        "length_px": 92.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            42.0,
+            34.375
+          ],
+          [
+            134.0,
+            34.375
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 1,
+        "length_px": 25.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            71.0,
+            117.0
+          ],
+          [
+            71.0,
+            142.0
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 2,
+        "length_px": 34.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            106.0,
+            161.0
+          ],
+          [
+            72.0,
+            161.0
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 3,
+        "length_px": 24.243567034055097
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            124.0,
+            102.33333333333334
+          ],
+          [
+            148.01041666666669,
+            105.6875
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 4,
+        "length_px": 29.03472222222222
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            148.01041666666669,
+            105.6875
+          ],
+          [
+            148.01041666666669,
+            134.72222222222223
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 5,
+        "length_px": 32.666666666666664
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            39.333333333333336,
+            58.30555555555554
+          ],
+          [
+            72.0,
+            58.30555555555554
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 6,
+        "length_px": 60.7733865593229
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            72.0,
+            57.54166666666666
+          ],
+          [
+            39.666666666666664,
+            109.0
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_10",
+        "id": 7,
+        "length_px": 50.69444444444446
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            39.666666666666664,
+            109.0
+          ],
+          [
+            39.666666666666664,
+            58.30555555555554
+          ]
+        ]
+      }
+    }
+  ]
+}

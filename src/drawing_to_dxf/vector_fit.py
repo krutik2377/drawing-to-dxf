@@ -166,15 +166,42 @@ def fit_circles_from_closed_polylines(
     )
 
 
+def complete_near_full_arcs_to_circles(
+    vd: VectorDrawing,
+    *,
+    min_span_deg: float = 315.0,
+) -> VectorDrawing:
+    """Promote almost-full arcs to circles to stabilize hole-like geometry in DXF."""
+    if min_span_deg >= 360.0:
+        return vd
+    arcs_kept: list = []
+    circles = list(vd.circles)
+    for a in vd.arcs:
+        span = _spans_deg_ccw(a.start_angle_deg, a.end_angle_deg) if a.ccw else _spans_deg_ccw(a.end_angle_deg, a.start_angle_deg)
+        if span >= float(min_span_deg):
+            circles.append(CircleDef(cx=a.cx, cy=a.cy, r=a.r))
+        else:
+            arcs_kept.append(a)
+    return VectorDrawing(
+        polylines=list(vd.polylines),
+        circles=circles,
+        arcs=arcs_kept,
+        residual_segments=list(vd.residual_segments),
+    )
+
+
 def apply_polyline_fittings(
     vd: VectorDrawing,
     *,
     fit_arcs: bool = True,
     fit_circles_from_loops: bool = True,
+    complete_full_arcs_to_circles_min_span_deg: float | None = 315.0,
 ) -> VectorDrawing:
     out = vd
     if fit_circles_from_loops:
         out = fit_circles_from_closed_polylines(out)
     if fit_arcs:
         out = fit_arcs_replace_polylines(out)
+    if complete_full_arcs_to_circles_min_span_deg is not None:
+        out = complete_near_full_arcs_to_circles(out, min_span_deg=float(complete_full_arcs_to_circles_min_span_deg))
     return out

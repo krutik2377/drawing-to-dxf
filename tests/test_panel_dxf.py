@@ -65,3 +65,34 @@ def test_run_panel_dxfs_optional_no_viewer_bundle(tmp_path):
     res = run_panel_dxfs(cfg)
     assert res.viewer_primary_dxf is None
     assert not (out_dir / "viewer").exists()
+
+
+def test_run_panel_dxfs_semantic_debug_dir_smoke(tmp_path):
+    gray = np.full((400, 700), 255, dtype=np.uint8)
+    gray[40:220, 40:260] = 30
+    gray[40:220, 420:640] = 30
+    bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    inp = tmp_path / "twoblobs_sem.png"
+    cv2.imwrite(str(inp), bgr)
+    dbg = tmp_path / "dbg_sem"
+    out_dir = tmp_path / "panel_sem_out"
+    cfg = PanelDxfRunConfig(
+        input_path=inp,
+        output_dir=out_dir,
+        skip_ocr=True,
+        max_side=None,
+        denoise=False,
+        deskew=False,
+        panel_min_area=8000,
+        panel_min_gap=24,
+        min_line_length=8,
+        mm_per_pixel=1.0,
+        layered_dxf=True,
+        rule_based_semantics=True,
+        debug_export_dir=dbg,
+    )
+    res = run_panel_dxfs(cfg)
+    assert res.panel_count >= 2
+    assert dbg.exists()
+    geojsons = list(dbg.glob("*.geojson"))
+    assert geojsons, "Expected segment GeoJSON in debug-export-dir"

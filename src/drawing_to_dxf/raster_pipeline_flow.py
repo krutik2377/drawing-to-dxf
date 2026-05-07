@@ -5,8 +5,13 @@ slightly from call order in code where physics dictates better results (e.g. den
 deskew run on continuous-tone gray before binarization; adaptive threshold is applied
 when building the ink mask inside vectorization).
 
-Consumers: manifests from ``pipeline.run`` and ``panel_dxf_pipeline.run_panel_dxfs``,
-and developer orientation when extending stages.
+**Engineering intelligence** (see ``ENGINEERING_INTELLIGENCE_LAYERS``) describes optional Python-side
+interpretation layers; **defaults are off**—CAD-style cleanup is expected via **AutoCAD MCP**
+(see ``cad_mcp_recipe`` and manifest ``cad_healing``) unless ``--python-*`` flags are used.
+Manifests include ``pipeline_flow`` (20 steps) and ``engineering_intelligence_layers``.
+
+Consumers: manifests from ``pipeline.run``, ``panel_dxf_pipeline.run_panel_dxfs``,
+``sheet_pipeline.run_sheet``, and developer orientation when extending stages.
 """
 
 from __future__ import annotations
@@ -62,8 +67,10 @@ CANONICAL_PIPELINE_STEPS: tuple[PipelineStepSpec, ...] = (
     PipelineStepSpec(
         7,
         "Separate OCR/text layer from geometry layer",
-        "ocr_extract.extract_text_boxes; annotation_clean.apply_text_masks / "
-        "apply_text_masks_interior_only before inks_mask_from_gray",
+        "ocr_extract.extract_text_boxes; optional ocr_llm_correct.correct_text_boxes_ollama / "
+        "correct_text_boxes_gemini; "
+        "optional semantic_segment.semantic_prepare_gray_for_vectorize (ONNX classes); "
+        "annotation_clean.apply_text_masks / apply_text_masks_interior_only before inks_mask_from_gray",
     ),
     PipelineStepSpec(
         8,
@@ -96,13 +103,15 @@ CANONICAL_PIPELINE_STEPS: tuple[PipelineStepSpec, ...] = (
     PipelineStepSpec(
         12,
         "Merge collinear and overlapping lines",
-        "topology_clean.refine_vector_drawing; vectorize._collapse_collinear_segments; "
-        "merge_collinear runs inside topology_clean",
+        "exploded segments: vectorize._merge_close_endpoints; optional topology_clean.refine_vector_drawing "
+        "when --python-topology-clean; CAD join/overkill deferred to AutoCAD MCP by default.",
     ),
     PipelineStepSpec(
         13,
         "Reconstruct topology graph/connectivity",
-        "skeleton_graph.skeleton_adjacency_graph + trace_skeleton_polylines",
+        "skeleton_graph.skeleton_adjacency_graph + trace_skeleton_polylines; optional "
+        "topology_repair.extend_free_endpoints_to_intersections (ray hits); "
+        "cad_geometry_rebuild.vector_drawing_from_healed_segments aligns DXF with healed LINE graph",
     ),
     PipelineStepSpec(
         14,
@@ -142,10 +151,9 @@ CANONICAL_PIPELINE_STEPS: tuple[PipelineStepSpec, ...] = (
     PipelineStepSpec(
         20,
         "Run post-processing cleanup and validation",
-        "topology_clean.refine_vector_drawing; vector_fit.apply_polyline_fittings; "
-        "vectorize length filters; optional geometry_intel bridge_open_polyline_gaps + residual dedupe; "
-        "geometry_intel.geometry_quality_report (confidence heuristic) + optional pipeline_timings_ms; "
-        "pipeline warnings in manifest.",
+        "Default: export rough DXF + ``*_autocad_mcp_recipe.json`` for JOIN / OVERKILL / PEDIT / layers / "
+        "dimensions in AutoCAD (MCP). Optional in-process: topology_clean, vector_fit, geometry_intel bridge/dedupe "
+        "(--python-* flags); geometry_intel.geometry_quality_report + manifest warnings.",
     ),
 )
 
@@ -155,4 +163,67 @@ def pipeline_flow_manifest_rows() -> list[dict[str, int | str]]:
     return [
         {"step": s.step_id, "title": s.title, "implementation": s.implementation}
         for s in CANONICAL_PIPELINE_STEPS
+    ]
+
+
+@dataclass(frozen=True)
+class EngineeringIntelligenceLayerSpec:
+    """Higher-level interpretation stage above raw vectorization (research-style CAD reconstruction)."""
+
+    layer_id: str
+    title: str
+    status: str
+    implementation: str
+
+
+# Five intelligence layers — map existing modules; ``roadmap`` marks deliberate gaps.
+ENGINEERING_INTELLIGENCE_LAYERS: tuple[EngineeringIntelligenceLayerSpec, ...] = (
+    EngineeringIntelligenceLayerSpec(
+        "semantic_reasoning",
+        "Semantic reasoning",
+        "optional",
+        "engineering_intel_passes.semantic_reasoning_snapshot when --python-engineering-intel; "
+        "link_geometry / OCR part association at export time always when OCR enabled.",
+    ),
+    EngineeringIntelligenceLayerSpec(
+        "engineering_constraints",
+        "Engineering constraints",
+        "optional",
+        "constraint_heal (+ engineering_intel residual snaps) only with --python-constraint-heal and "
+        "--python-engineering-intel; otherwise defer to AutoCAD constraints/MCP.",
+    ),
+    EngineeringIntelligenceLayerSpec(
+        "topology_intelligence",
+        "Topology intelligence",
+        "optional",
+        "topology_repair on segments with --python-topology-segment-repair; topology_intel metrics with "
+        "--python-engineering-intel; else MCP/CAD for graph cleanup.",
+    ),
+    EngineeringIntelligenceLayerSpec(
+        "cad_regularization",
+        "CAD regularization",
+        "optional",
+        "topology_clean / vectorize refinements when --python-*; primary regularization via AutoCAD MCP recipe.",
+    ),
+    EngineeringIntelligenceLayerSpec(
+        "dimension_understanding",
+        "Dimension understanding",
+        "active",
+        "annotations_export.dimension_association_bundle: axis hints + OCR↔stroke association records "
+        "+ perpendicular extension stubs on DIMENSION_HINT layer (when export enabled); manifest "
+        "dimension_associations.",
+    ),
+)
+
+
+def engineering_intelligence_manifest_rows() -> list[dict[str, str]]:
+    """JSON-serializable intelligence layer rows for manifests."""
+    return [
+        {
+            "layer": x.layer_id,
+            "title": x.title,
+            "status": x.status,
+            "implementation": x.implementation,
+        }
+        for x in ENGINEERING_INTELLIGENCE_LAYERS
     ]

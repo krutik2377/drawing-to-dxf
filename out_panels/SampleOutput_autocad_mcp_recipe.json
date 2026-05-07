@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "description": "Post-process rough DXF from drawing-to-dxf in AutoCAD (or via an AutoCAD MCP server). Upstream steps handle raster interpretation, OCR separation, semantic layer stubs, and primitive extraction; use the layer stubs (GEOMETRY, DIMENSION*, BORDER) as guides.",
+  "input_dxfs": [
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\SampleOutput_autodesk_layout.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_00.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_01.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_02.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_03.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_04.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_05.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_06.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_07.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_08.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_09.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_10.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_11.dxf",
+    "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_panels\\viewer\\models\\panel_12.dxf"
+  ],
+  "scale_hint_mm_per_pixel": 1.0,
+  "suggested_autocad_steps": [
+    "OPEN \u2014 load a DXF from input_dxfs.",
+    "AUDIT \u2014 report/fix entity errors.",
+    "ZOOM E \u2014 review extents.",
+    "LAYER \u2014 freeze DIMENSION_HINT / DIMENSION_ASSOC while cleaning part geometry if needed.",
+    "QSELECT \u2014 filter by layer (GEOMETRY, UNASSIGNED, P_* parts, BORDER, OCR_TEXT).",
+    "OVERKILL \u2014 remove duplicate overlays; start with a small tolerance scaled in mm.",
+    "JOIN \u2014 merge collinear contiguous LINE segments (especially on GEOMETRY / P_* layers).",
+    "PEDIT \u2014 Join / Multiple \u2014 convert fragmented LINE chains to LWPOLYLINE as appropriate.",
+    "FILLET \u2014 corner cleanup where design intent is orthogonal metal/plate outlines.",
+    "ALIGN \u2014 align inserts or duplicated panels if multi-block shop layout.",
+    "DIMENSION / DIMSTYLE \u2014 replace DIMENSION_ASSOC stubs with drafting-standard dims if required.",
+    "BLOCK \u2014 repeated plate outlines / symbols to insertable blocks.",
+    "PURGE \u2014 unused layers and styles.",
+    "SAVEAS \u2014 native DWG when satisfied."
+  ],
+  "recommended_command_macro_order": [
+    "OVERKILL\u2192JOIN\u2192PEDIT Join\u2192FILLET (selective)\u2192PURGE"
+  ],
+  "mcp_agent_hint": "Expose these as invocations against the AutoCAD command line or .NET API. Prefer the assembly or layout DXF when a single file represents the sheet; otherwise batch panel / per-part DXFs. Run topology healing (JOIN/OVERKILL) after reviewing semantic overlay layers from raster classification."
+}

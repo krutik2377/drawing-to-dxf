@@ -24,9 +24,10 @@ def _sheet_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--ocr-gpu", action="store_true")
     p.add_argument(
         "--ai",
-        choices=("none", "openai", "ollama"),
+        choices=("none", "openai", "ollama", "gemini"),
         default="none",
-        help="Structured extraction: paid API (openai) or free local (ollama + vision model)",
+        help="Structured extraction: gemini (free-tier Google AI Studio), "
+        "local ollama+vision, or paid OpenAI-compatible API",
     )
     p.add_argument("--openai-model", type=str, default="gpt-4o-mini")
     p.add_argument(
@@ -37,6 +38,12 @@ def _sheet_args(p: argparse.ArgumentParser) -> None:
     )
     p.add_argument("--ollama-host", type=str, default="http://127.0.0.1:11434")
     p.add_argument("--ollama-model", type=str, default="llava")
+    p.add_argument(
+        "--gemini-model",
+        type=str,
+        default="gemini-2.0-flash",
+        help="Gemini model id for --ai gemini (overridable if a region exposes a different slug)",
+    )
     p.add_argument(
         "--layout-cols",
         type=int,
@@ -72,6 +79,7 @@ def sheet_main(argv: list[str] | None = None) -> int:
         openai_model=args.openai_model,
         ollama_host=args.ollama_host,
         ollama_model=args.ollama_model,
+        gemini_model=args.gemini_model,
         layout_cols=args.layout_cols,
     )
     try:
@@ -137,6 +145,12 @@ def panels_main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--mm-per-pixel", type=float, default=1.0)
     p.add_argument(
+        "--reconstruction",
+        choices=("none", "shop", "full"),
+        default="none",
+        help="shop: topology/constraint/intel bundle; full: shop + unified engineering reconstruction suite + semantic DXF layers",
+    )
+    p.add_argument(
         "--viewer-layout-gap-mm",
         type=float,
         default=25.0,
@@ -194,9 +208,9 @@ def panels_main(argv: list[str] | None = None) -> int:
         help="Aggressive ruling-line suppression on adaptive ink mask",
     )
     p.add_argument(
-        "--no-topology-clean",
+        "--python-topology-clean",
         action="store_true",
-        help="Skip HV snap / collinear merge on lwpolylines",
+        help="In-process lwpolyline tidy (topology_clean); default off—prefer AutoCAD MCP after export",
     )
     p.add_argument(
         "--no-arc-fit",
@@ -236,6 +250,55 @@ def panels_main(argv: list[str] | None = None) -> int:
         help="Bridge open polyline endpoints facing each other within this gap (pixels); 0 disables",
     )
     p.add_argument(
+        "--python-topology-segment-repair",
+        action="store_true",
+        help="In-process junction snap + gap bridges on exploded segments; default off",
+    )
+    p.add_argument(
+        "--topology-max-bridge-gap",
+        type=float,
+        default=None,
+        help="Max gap (px) for segment endpoint bridges; default derives from merge distance",
+    )
+    p.add_argument(
+        "--topology-junction-snap",
+        type=float,
+        default=3.0,
+        help="Snap endpoints onto segment interiors within this distance (px); 0 disables",
+    )
+    p.add_argument(
+        "--topology-bridge-dot-min",
+        type=float,
+        default=0.42,
+        help="Minimum cosine alignment for directed gap bridges (0–1)",
+    )
+    p.add_argument(
+        "--annotation-box-shrink-pad",
+        type=float,
+        default=0.0,
+        help="Shrink effective OCR mask pad by this many px per box side",
+    )
+    p.add_argument(
+        "--engineering-layout",
+        action="store_true",
+        help="Milder horizontal ruling suppression on ink mask",
+    )
+    p.add_argument(
+        "--multi-scale-ink",
+        action="store_true",
+        help="Fuse second adaptive-threshold pass for thin strokes",
+    )
+    p.add_argument(
+        "--no-hole-ring-protect",
+        action="store_true",
+        help="Disable hole-ring preservation before skeletonization",
+    )
+    p.add_argument(
+        "--python-constraint-heal",
+        action="store_true",
+        help="In-process orthogonal 4-gon closure; default off—prefer constraints in CAD/MCP",
+    )
+    p.add_argument(
         "--no-dedupe-geometry-residuals",
         action="store_true",
         help="Keep redundant overlapping LINE residuals (LSD/double edges)",
@@ -245,6 +308,21 @@ def panels_main(argv: list[str] | None = None) -> int:
         type=float,
         default=None,
         help="Nominal raster DPI for scaling length thresholds vs 150dpi baseline (default: --pdf-dpi on PDF, else 150)",
+    )
+    p.add_argument(
+        "--python-engineering-reconstruction-suite",
+        action="store_true",
+        help="Unified reconstruction suite on each panel (topology, CAD cleanup, dimensions, QA)",
+    )
+    p.add_argument(
+        "--python-engineering-intel",
+        action="store_true",
+        help="In-process semantic/constraint/topology metrics on vectors; default off",
+    )
+    p.add_argument(
+        "--python-cad-reconstruction",
+        action="store_true",
+        help="Stronger topology: ray intersection extend, axis/parallel snap, healed LINE export",
     )
 
     args = p.parse_args(argv)
@@ -276,7 +354,7 @@ def panels_main(argv: list[str] | None = None) -> int:
         mask_annotation_via_ocr_crop=not args.no_mask_ocr_crops,
         mask_text_interior_only=not args.full_rect_ocr_mask,
         soft_ink_mask=not args.no_soft_ink,
-        enable_topology_clean=not args.no_topology_clean,
+        enable_topology_clean=args.python_topology_clean,
         enable_arc_fitting=not args.no_arc_fit,
         enable_loop_circle_fit=not args.no_arc_fit,
         trace_debug_dir=args.trace_debug_dir,
@@ -294,7 +372,39 @@ def panels_main(argv: list[str] | None = None) -> int:
         geometry_bridge_gap_px=args.geometry_bridge_gap,
         dedupe_geometry_residuals=not args.no_dedupe_geometry_residuals,
         raster_dpi_nominal=args.raster_dpi,
+        enable_topology_segment_repair=args.python_topology_segment_repair,
+        topology_max_bridge_gap_px=args.topology_max_bridge_gap,
+        topology_junction_snap_px=args.topology_junction_snap,
+        topology_bridge_direction_dot_min=args.topology_bridge_dot_min,
+        annotation_box_shrink_from_pad_px=args.annotation_box_shrink_pad,
+        engineering_layout=args.engineering_layout,
+        multi_scale_ink=args.multi_scale_ink,
+        protect_hole_rings=not args.no_hole_ring_protect,
+        enable_constraint_heal=args.python_constraint_heal,
+        enable_engineering_intel_passes=args.python_engineering_intel,
+        reconstruction_preset=args.reconstruction if args.reconstruction != "none" else None,
+        enable_engineering_reconstruction_suite=args.python_engineering_reconstruction_suite,
     )
+    if args.reconstruction == "full":
+        from dataclasses import replace
+
+        from drawing_to_dxf.reconstruction_preset import apply_full_engineering_reconstruction_to_panel_config
+
+        cfg = apply_full_engineering_reconstruction_to_panel_config(cfg)
+        if args.no_skeleton_circles:
+            cfg = replace(cfg, enable_skeleton_circles=False)
+    elif args.reconstruction == "shop":
+        from dataclasses import replace
+
+        from drawing_to_dxf.reconstruction_preset import apply_shop_reconstruction_to_panel_config
+
+        cfg = apply_shop_reconstruction_to_panel_config(cfg)
+        if args.no_skeleton_circles:
+            cfg = replace(cfg, enable_skeleton_circles=False)
+    if args.python_cad_reconstruction:
+        from drawing_to_dxf.reconstruction_preset import apply_python_cad_reconstruction_bundle_to_panel_config
+
+        cfg = apply_python_cad_reconstruction_bundle_to_panel_config(cfg)
     try:
         res = run_panel_dxfs(cfg)
     except Exception as e:  # noqa: BLE001
@@ -323,6 +433,12 @@ def convert_main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path("out"),
         help="Directory for DXF + manifest (default: ./out)",
+    )
+    p.add_argument(
+        "--reconstruction",
+        choices=("none", "shop", "full"),
+        default="none",
+        help="shop/full Python reconstruction bundles; see manifest reconstruction_roadmap",
     )
     p.add_argument("--pdf-page", type=int, default=0, help="Zero-based PDF page index")
     p.add_argument("--pdf-dpi", type=float, default=150.0, help="Rasterization DPI for PDF input")
@@ -397,9 +513,9 @@ def convert_main(argv: list[str] | None = None) -> int:
         help="Apply aggressive horizontal ruling suppression on adaptive ink mask",
     )
     p.add_argument(
-        "--no-topology-clean",
+        "--python-topology-clean",
         action="store_true",
-        help="Skip orthogonal/collinear tidy pass on traced lwpolylines",
+        help="In-process lwpolyline tidy (topology_clean); default off—use AutoCAD MCP after export",
     )
     p.add_argument(
         "--no-arc-fit",
@@ -450,6 +566,71 @@ def convert_main(argv: list[str] | None = None) -> int:
         help="Bridge open polyline endpoints within this gap (px); 0 disables",
     )
     p.add_argument(
+        "--python-topology-segment-repair",
+        action="store_true",
+        help="In-process junction snap + gap bridges on exploded segments; default off",
+    )
+    p.add_argument(
+        "--topology-max-bridge-gap",
+        type=float,
+        default=None,
+        help="Max gap (px) for segment endpoint bridges; default derives from merge distance",
+    )
+    p.add_argument(
+        "--topology-junction-snap",
+        type=float,
+        default=3.0,
+        help="Snap free endpoints onto nearby segment interiors within this distance (px); 0 disables",
+    )
+    p.add_argument(
+        "--topology-bridge-dot-min",
+        type=float,
+        default=0.42,
+        help="Minimum cosine alignment for directed gap bridges (0–1)",
+    )
+    p.add_argument(
+        "--annotation-box-shrink-pad",
+        type=float,
+        default=0.0,
+        help="Reduce effective OCR mask padding by this many px (preserves linework near annotations)",
+    )
+    p.add_argument(
+        "--engineering-layout",
+        action="store_true",
+        help="Milder horizontal ruling suppression (preserves more construction/dimension ticks)",
+    )
+    p.add_argument(
+        "--multi-scale-ink",
+        action="store_true",
+        help="Fuse a second adaptive-threshold pass to recover thin strokes",
+    )
+    p.add_argument(
+        "--no-hole-ring-protect",
+        action="store_true",
+        help="Do not restore hole circle ink after small-object removal",
+    )
+    p.add_argument(
+        "--python-constraint-heal",
+        action="store_true",
+        help="In-process orthogonal closure for nearly-rectangular 4-gons; default off",
+    )
+    p.add_argument(
+        "--debug-export-dir",
+        type=Path,
+        default=None,
+        help="Write raster debug PNGs and segments GeoJSON under this directory",
+    )
+    p.add_argument(
+        "--no-export-ocr-text-dxf",
+        action="store_true",
+        help="Omit OCR_TEXT layer from DXF exports",
+    )
+    p.add_argument(
+        "--no-dimension-hints-dxf",
+        action="store_true",
+        help="Omit DIMENSION_HINT heuristic overlay layer",
+    )
+    p.add_argument(
         "--no-dedupe-geometry-residuals",
         action="store_true",
         help="Keep overlapping duplicate residual segments",
@@ -464,6 +645,84 @@ def convert_main(argv: list[str] | None = None) -> int:
         "--profile-pipeline",
         action="store_true",
         help="Write preprocess/OCR/vectorize/export timings to manifest",
+    )
+    p.add_argument(
+        "--python-engineering-intel",
+        action="store_true",
+        help="In-process semantic/constraint/topology-intel passes + manifest metrics; default off",
+    )
+    p.add_argument(
+        "--python-cad-reconstruction",
+        action="store_true",
+        help="Stronger topology: ray intersection extension, axis/parallel regularization, "
+        "and DXF export from healed LINE graph (circles/arcs kept)",
+    )
+    p.add_argument(
+        "--semantic-seg-onnx",
+        type=Path,
+        default=None,
+        help="Optional ONNX segmentation model: inpaint non-geometry classes before skeleton tracing "
+        "(install: pip install -e \".[ml]\")",
+    )
+    p.add_argument(
+        "--semantic-seg-config",
+        type=Path,
+        default=None,
+        help="JSON: classes, suppress_for_skeleton, input_width/height, normalize, layout (nchw|nhwc)",
+    )
+    p.add_argument(
+        "--semantic-seg-suppress-dimension",
+        action="store_true",
+        help="Also mask \"dimension\" class from segmentation (aggressive)",
+    )
+    p.add_argument(
+        "--ollama-ocr-correct",
+        action="store_true",
+        help="After EasyOCR, batch-correct strings via local Ollama text model",
+    )
+    p.add_argument("--ollama-host", type=str, default="http://127.0.0.1:11434")
+    p.add_argument(
+        "--ollama-text-model",
+        type=str,
+        default="llama3.2",
+        help="Text-only model for --ollama-ocr-correct (e.g. llama3.2, mistral)",
+    )
+    p.add_argument(
+        "--gemini-ocr-correct",
+        action="store_true",
+        help="After EasyOCR, batch-correct strings via Gemini (text-only; GEMINI_API_KEY or GOOGLE_API_KEY)",
+    )
+    p.add_argument(
+        "--gemini-text-model",
+        type=str,
+        default="gemini-2.0-flash",
+        help="Model id for --gemini-ocr-correct (Google AI Studio generateContent)",
+    )
+    p.add_argument(
+        "--layered-dxf",
+        action="store_true",
+        help="Emit semantic LINE layers (GEOMETRY/DIMENSION/BORDER/ANNOTATION) from pixel labels + exploded segments",
+    )
+    p.add_argument(
+        "--rule-based-semantics",
+        action="store_true",
+        help="Use rule-based class raster (OCR + ruling + frame band), merged with ONNX when both set",
+    )
+    p.add_argument(
+        "--emit-linear-dimension-entities",
+        action="store_true",
+        help="Add ezdxf LINEAR DIMENSION entities where numeric OCR associates to an axis segment",
+    )
+    p.add_argument(
+        "--python-engineering-reconstruction-suite",
+        action="store_true",
+        help="Unified reconstruction: topology refine, CAD graph cleanup, dimension objects, multilayer semantics, QA",
+    )
+    p.add_argument(
+        "--topology-loop-close",
+        type=float,
+        default=0.0,
+        help="Bridge nearly closed chains: connect deg-1 endpoints within this gap (pixels); 0=off",
     )
 
     args = p.parse_args(argv)
@@ -500,7 +759,7 @@ def convert_main(argv: list[str] | None = None) -> int:
         legacy_vectorize_hough=args.legacy_hough_vectorize,
         mask_text_interior_only=not args.full_rect_ocr_mask,
         soft_ink_mask=not args.no_soft_ink,
-        enable_topology_clean=not args.no_topology_clean,
+        enable_topology_clean=args.python_topology_clean,
         enable_arc_fitting=not args.no_arc_fit,
         enable_loop_circle_fit=not args.no_arc_fit,
         ocr_gpu=args.ocr_gpu,
@@ -512,7 +771,50 @@ def convert_main(argv: list[str] | None = None) -> int:
         dedupe_geometry_residuals=not args.no_dedupe_geometry_residuals,
         raster_dpi_nominal=args.raster_dpi,
         profile_pipeline=args.profile_pipeline,
+        enable_topology_segment_repair=args.python_topology_segment_repair,
+        topology_max_bridge_gap_px=args.topology_max_bridge_gap,
+        topology_junction_snap_px=args.topology_junction_snap,
+        topology_bridge_direction_dot_min=args.topology_bridge_dot_min,
+        annotation_box_shrink_from_pad_px=args.annotation_box_shrink_pad,
+        engineering_layout=args.engineering_layout,
+        multi_scale_ink=args.multi_scale_ink,
+        protect_hole_rings=not args.no_hole_ring_protect,
+        enable_constraint_heal=args.python_constraint_heal,
+        debug_export_dir=args.debug_export_dir,
+        export_ocr_text_to_dxf=not args.no_export_ocr_text_dxf,
+        export_dimension_hints_to_dxf=not args.no_dimension_hints_dxf,
+        enable_engineering_intel_passes=args.python_engineering_intel,
+        reconstruction_preset=args.reconstruction if args.reconstruction != "none" else None,
+        semantic_seg_onnx=args.semantic_seg_onnx,
+        semantic_seg_config=args.semantic_seg_config,
+        semantic_seg_suppress_dimension=args.semantic_seg_suppress_dimension,
+        ollama_ocr_correct=args.ollama_ocr_correct,
+        ollama_host=args.ollama_host,
+        ollama_text_model=args.ollama_text_model,
+        gemini_ocr_correct=args.gemini_ocr_correct,
+        gemini_text_model=args.gemini_text_model,
+        layered_dxf=args.layered_dxf,
+        rule_based_semantics=args.rule_based_semantics,
+        emit_linear_dimension_entities=args.emit_linear_dimension_entities,
+        topology_loop_close_px=args.topology_loop_close,
+        enable_engineering_reconstruction_suite=args.python_engineering_reconstruction_suite,
     )
+    if args.reconstruction == "full":
+        from drawing_to_dxf.reconstruction_preset import apply_full_engineering_reconstruction_to_run_config
+
+        cfg = apply_full_engineering_reconstruction_to_run_config(cfg)
+    elif args.reconstruction == "shop":
+        from dataclasses import replace
+
+        from drawing_to_dxf.reconstruction_preset import apply_shop_reconstruction_to_run_config
+
+        cfg = apply_shop_reconstruction_to_run_config(cfg)
+        if args.no_skeleton_circles:
+            cfg = replace(cfg, enable_skeleton_circles=False)
+    if args.python_cad_reconstruction:
+        from drawing_to_dxf.reconstruction_preset import apply_python_cad_reconstruction_bundle_to_run_config
+
+        cfg = apply_python_cad_reconstruction_bundle_to_run_config(cfg)
 
     try:
         res = run(cfg)

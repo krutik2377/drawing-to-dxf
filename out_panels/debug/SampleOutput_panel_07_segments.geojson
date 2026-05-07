@@ -1,0 +1,110 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_07",
+        "id": 0,
+        "length_px": 27.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            109.0,
+            64.0
+          ],
+          [
+            109.0,
+            91.0
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_07",
+        "id": 1,
+        "length_px": 39.41939736841355
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            86.66666666666667,
+            66.33333333333333
+          ],
+          [
+            60.333333333333336,
+            95.66666666666666
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_07",
+        "id": 2,
+        "length_px": 31.999999999999993
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            60.333333333333336,
+            95.66666666666666
+          ],
+          [
+            92.33333333333333,
+            95.66666666666666
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_07",
+        "id": 3,
+        "length_px": 29.87566828634224
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            92.33333333333333,
+            95.66666666666666
+          ],
+          [
+            86.66666666666667,
+            66.33333333333333
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_07",
+        "id": 4,
+        "length_px": 33.66666666666667
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            86.66666666666667,
+            66.33333333333333
+          ],
+          [
+            53.0,
+            66.33333333333333
+          ]
+        ]
+      }
+    }
+  ]
+}

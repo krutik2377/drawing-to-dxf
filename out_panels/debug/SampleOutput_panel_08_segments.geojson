@@ -1,0 +1,215 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 0,
+        "length_px": 75.89068630181907
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            133.33333333333331,
+            85.6875
+          ],
+          [
+            70.0,
+            127.5
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 1,
+        "length_px": 23.90083680543424
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            70.0,
+            127.5
+          ],
+          [
+            93.0,
+            134.0
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 2,
+        "length_px": 44.94527922930283
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            93.0,
+            134.0
+          ],
+          [
+            136.875,
+            124.25
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 3,
+        "length_px": 38.5625
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            133.33333333333331,
+            85.6875
+          ],
+          [
+            133.33333333333331,
+            124.25
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 4,
+        "length_px": 34.333333333333314
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            133.33333333333331,
+            85.6875
+          ],
+          [
+            99.0,
+            85.6875
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 5,
+        "length_px": 24.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            99.0,
+            57.0
+          ],
+          [
+            123.0,
+            57.0
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 6,
+        "length_px": 45.21317585381696
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            136.875,
+            124.25
+          ],
+          [
+            93.32460522840087,
+            112.10115700874982
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 7,
+        "length_px": 53.25
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            36.25,
+            93.0
+          ],
+          [
+            36.25,
+            39.75
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 8,
+        "length_px": 37.02083333333333
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            37.3125,
+            39.75
+          ],
+          [
+            74.33333333333333,
+            39.75
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stem": "SampleOutput_panel_08",
+        "id": 9,
+        "length_px": 66.07828900461767
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            74.33333333333333,
+            39.0
+          ],
+          [
+            36.25,
+            93.0
+          ]
+        ]
+      }
+    }
+  ]
+}

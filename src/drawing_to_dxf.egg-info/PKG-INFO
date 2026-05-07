@@ -14,6 +14,8 @@ Requires-Dist: networkx<4.0,>=3.2
 Requires-Dist: shapely<3.0.0,>=2.0.0
 Provides-Extra: ocr
 Requires-Dist: easyocr>=1.7.0; extra == "ocr"
+Provides-Extra: ml
+Requires-Dist: onnxruntime<2.0.0,>=1.16.0; extra == "ml"
 Provides-Extra: ui
 Requires-Dist: streamlit<2.0.0,>=1.28.0; extra == "ui"
 Provides-Extra: dev

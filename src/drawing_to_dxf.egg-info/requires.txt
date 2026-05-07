@@ -10,6 +10,9 @@ shapely<3.0.0,>=2.0.0
 [dev]
 pytest<9.0.0,>=7.4.0
 
+[ml]
+onnxruntime<2.0.0,>=1.16.0
+
 [ocr]
 easyocr>=1.7.0
 
