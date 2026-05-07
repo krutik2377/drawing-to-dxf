@@ -1,3 +1,14 @@
+cd C:\Users\admin\Desktop\HyzenInterview
+.\.venv\Scripts\Activate.ps1
+$env:GEMINI_API_KEY = "YOUR_KEY"
+
+# Raster → DXF (normal case for a drawing image)
+drawing-to-dxf convert "C:\Users\admin\Desktop\HyzenInterview\Resource\SampleOutput.png" -o out_dxf --gemini-ocr-correct
+
+# Optional: Gemini vision + panel split + manifest (only if this file is a *multi-panel* sheet with white gutters between parts)
+drawing-to-dxf sheet "C:\Users\admin\Desktop\HyzenInterview\Resource\SampleOutput.png" -o out_sheet --ai gemini
+
+
 # drawing-to-dxf
 
 Turn **raster or PDF engineering sheets** into **AutoCAD-compatible DXF** files: full-sheet vectorization plus an **optional heuristic split** into per-part drawings using **OCR** for stamped part numbers (for example `701`, `1024`).

@@ -1,0 +1,279 @@
+{
+  "version": 1,
+  "pipeline_flow": [
+    {
+      "step": 1,
+      "title": "Load raster image",
+      "implementation": "preprocess.load_image_bgr, preprocess.load_pdf_page_as_bgr; pipeline.load_input_bgr / panel_dxf_pipeline._load_bgr"
+    },
+    {
+      "step": 2,
+      "title": "Convert to grayscale",
+      "implementation": "preprocess.preprocess (cv2.cvtColor BGR\u2192GRAY)"
+    },
+    {
+      "step": 3,
+      "title": "Apply adaptive thresholding",
+      "implementation": "annotation_clean.inks_mask_from_gray (cv2.adaptiveThreshold ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV)"
+    },
+    {
+      "step": 4,
+      "title": "Perform deskewing/alignment",
+      "implementation": "preprocess._deskew_gray (invoked from preprocess.preprocess when deskew=True)"
+    },
+    {
+      "step": 5,
+      "title": "Remove noise",
+      "implementation": "preprocess.preprocess bilateral denoise; skeleton_vectorize.extract_vector_drawing remove_small_objects on foreground before skeletonize"
+    },
+    {
+      "step": 6,
+      "title": "Apply morphology closing to reconnect broken lines",
+      "implementation": "annotation_clean.suppress_hatches_and_dimensions MORPH_CLOSE on binary ink (when suppress_ruling_lines=True); preprocess._deskew_gray uses a small close on Otsu mask"
+    },
+    {
+      "step": 7,
+      "title": "Separate OCR/text layer from geometry layer",
+      "implementation": "ocr_extract.extract_text_boxes; optional ocr_llm_correct.correct_text_boxes_ollama / correct_text_boxes_gemini; optional semantic_segment.semantic_prepare_gray_for_vectorize (ONNX classes); annotation_clean.apply_text_masks / apply_text_masks_interior_only before inks_mask_from_gray"
+    },
+    {
+      "step": 8,
+      "title": "Detect line segments using LSD/Hough Transform",
+      "implementation": "Primary path: skeleton_graph.trace_skeleton_polylines. Alternates: vectorize._legacy_hough_extract_segments (HoughLinesP). Optional supplement: geometry_intel.lsd_extract_segments (cv2.createLineSegmentDetector) via --vectorize-lsd-supplement in vectorize.extract_skeleton_vector_bundle."
+    },
+    {
+      "step": 9,
+      "title": "Detect circles/arcs using HoughCircles",
+      "implementation": "skeleton_vectorize.detect_circles (optional, off by default): tighter Hough params, rim + **hole-interior** validation on binary ink, hard cap on count. Enable with --skeleton-circles. vector_fit.apply_polyline_fittings for arc / loop-to-CIRCLE when arc fitting is on."
+    },
+    {
+      "step": 10,
+      "title": "Detect rectangles and closed polylines",
+      "implementation": "Closed loops: skeleton traces with closed=True \u2192 geometry_model.PolylineDef.closed. Orthogonal 4-gons tallied as rectangle_like_polylines (geometry_intel.count_corner_rectangles); no separate DXF RECTANGLE entity type."
+    },
+    {
+      "step": 11,
+      "title": "Snap nearby endpoints together",
+      "implementation": "vectorize.extract_skeleton_vector_bundle \u2192 _merge_close_endpoints on exploded segments"
+    },
+    {
+      "step": 12,
+      "title": "Merge collinear and overlapping lines",
+      "implementation": "exploded segments: vectorize._merge_close_endpoints; optional topology_clean.refine_vector_drawing when --python-topology-clean; CAD join/overkill deferred to AutoCAD MCP by default."
+    },
+    {
+      "step": 13,
+      "title": "Reconstruct topology graph/connectivity",
+      "implementation": "skeleton_graph.skeleton_adjacency_graph + trace_skeleton_polylines; optional topology_repair.extend_free_endpoints_to_intersections (ray hits); cad_geometry_rebuild.vector_drawing_from_healed_segments aligns DXF with healed LINE graph"
+    },
+    {
+      "step": 14,
+      "title": "Detect dimensions, arrows, and extension lines",
+      "implementation": "Partial: annotation_clean.suppress_hatches_and_dimensions removes long horizontal ruling motifs; no dedicated arrow/dimension classifier."
+    },
+    {
+      "step": 15,
+      "title": "Group related entities into drawing parts/blocks",
+      "implementation": "pipeline: link_geometry.link_vector_geometry_to_parts + link_parts.PartGroup; panels: panel_split.split_panels then per-crop export"
+    },
+    {
+      "step": 16,
+      "title": "Preserve original scaling and coordinates",
+      "implementation": "PreprocessResult.original_shape, scale; RunConfig.mm_per_pixel; export_dxf.image_xy_to_dxf consistent Y-flip + scale in manifests"
+    },
+    {
+      "step": 17,
+      "title": "Convert primitives into CAD entities (LINE, ARC, CIRCLE, TEXT, etc.)",
+      "implementation": "export_dxf._emit_vector_entities: LWPOLYLINE, ARC, CIRCLE, LINE residuals; TEXT via PartGroup label points on part layers"
+    },
+    {
+      "step": 18,
+      "title": "Generate structured DXF entities/layers",
+      "implementation": "export_dxf.export_merged_dxf / export_part_dxf / export_segments_only (layer-per-part or GEOMETRY/LABEL conventions)"
+    },
+    {
+      "step": 19,
+      "title": "Export final DXF file",
+      "implementation": "ezdxf writes in export_dxf; paths recorded in *_manifest.json"
+    },
+    {
+      "step": 20,
+      "title": "Run post-processing cleanup and validation",
+      "implementation": "Default: export rough DXF + ``*_autocad_mcp_recipe.json`` for JOIN / OVERKILL / PEDIT / layers / dimensions in AutoCAD (MCP). Optional in-process: topology_clean, vector_fit, geometry_intel bridge/dedupe (--python-* flags); geometry_intel.geometry_quality_report + manifest warnings."
+    }
+  ],
+  "engineering_intelligence_layers": [
+    {
+      "layer": "semantic_reasoning",
+      "title": "Semantic reasoning",
+      "status": "optional",
+      "implementation": "engineering_intel_passes.semantic_reasoning_snapshot when --python-engineering-intel; link_geometry / OCR part association at export time always when OCR enabled."
+    },
+    {
+      "layer": "engineering_constraints",
+      "title": "Engineering constraints",
+      "status": "optional",
+      "implementation": "constraint_heal (+ engineering_intel residual snaps) only with --python-constraint-heal and --python-engineering-intel; otherwise defer to AutoCAD constraints/MCP."
+    },
+    {
+      "layer": "topology_intelligence",
+      "title": "Topology intelligence",
+      "status": "optional",
+      "implementation": "topology_repair on segments with --python-topology-segment-repair; topology_intel metrics with --python-engineering-intel; else MCP/CAD for graph cleanup."
+    },
+    {
+      "layer": "cad_regularization",
+      "title": "CAD regularization",
+      "status": "optional",
+      "implementation": "topology_clean / vectorize refinements when --python-*; primary regularization via AutoCAD MCP recipe."
+    },
+    {
+      "layer": "dimension_understanding",
+      "title": "Dimension understanding",
+      "status": "active",
+      "implementation": "annotations_export.dimension_association_bundle: axis hints + OCR\u2194stroke association records + perpendicular extension stubs on DIMENSION_HINT layer (when export enabled); manifest dimension_associations."
+    }
+  ],
+  "reconstruction_roadmap": [
+    {
+      "stage": 1,
+      "title": "Raster acquisition and preprocess",
+      "status": "implemented",
+      "implementation": "preprocess.preprocess: denoise, deskew, scale; grayscale for ink mask + skeleton."
+    },
+    {
+      "stage": 2,
+      "title": "Ink / geometry vs text separation",
+      "status": "partial",
+      "implementation": "OCR masks + annotation_clean text interior inpainting; dimension text not structured as DIM entities."
+    },
+    {
+      "stage": 3,
+      "title": "Primitive extraction (lines, arcs, circles)",
+      "status": "partial",
+      "implementation": "skeleton_vectorize + vectorize; optional Hough circles (--skeleton-circles); vector_fit arcs; fragments remain without strong reconstruction."
+    },
+    {
+      "stage": 4,
+      "title": "Topology repair and graph connectivity",
+      "status": "partial",
+      "implementation": "topology_repair.repair_exploded_segments; topology_clean.refine_vector_drawing; engineering_intel axis/cluster snaps when enabled (--python-* or --reconstruction shop)."
+    },
+    {
+      "stage": 5,
+      "title": "Constraint and orthogonal regularization",
+      "status": "partial",
+      "implementation": "constraint_heal orthogonal quads; residual snaps in engineering_intel_passes; full constraint solver not implemented."
+    },
+    {
+      "stage": 6,
+      "title": "Dimension system reconstruction",
+      "status": "partial",
+      "implementation": "annotations_export.dimension_association_bundle + DIMENSION_HINT layer; no full extension-line / arrow DIM block model."
+    },
+    {
+      "stage": 7,
+      "title": "Semantic entity classification",
+      "status": "partial",
+      "implementation": "segment_semantics + raster_semantics / ONNX; engineering_intel_extended.symbol_candidates; engineering_reconstruction_suite multilayer bucket expansion."
+    },
+    {
+      "stage": 8,
+      "title": "Structured DXF / layer model",
+      "status": "implemented",
+      "implementation": "export_dxf: LWPOLYLINE, LINE, ARC, CIRCLE, TEXT, layers per part/panel."
+    },
+    {
+      "stage": 9,
+      "title": "Native CAD polish (MCP / interactive)",
+      "status": "implemented",
+      "implementation": "cad_mcp_recipe: JOIN, OVERKILL, PEDIT, layers\u2014assumes reasonable upstream geometry."
+    }
+  ],
+  "input": "C:\\Users\\admin\\Desktop\\HyzenInterview\\Resource\\Sample.png",
+  "processed_size_px": {
+    "width": 1476,
+    "height": 1205
+  },
+  "ai_provider": "gemini",
+  "panels": [
+    {
+      "index": 0,
+      "bbox_px": {
+        "x": 0,
+        "y": 7,
+        "w": 961,
+        "h": 777
+      },
+      "ocr_excerpt": "Stol 7446LL Mitte (0.70)\nBLE 28+85- 733 (0.08)\n733 (0.91)\nRE 6,28-730 (0.14)\n730 (1.00)\n5a2s (0.01)\n221126 (0.13)\nLuhd (0.03)\n732 (1.00)\n732 (1.00)\nauanep (0.00)\nKE 2l'1el (0.03)\n55n2425 R (0.25)\nLLA (0.18)\n729 (1.00)\n729 (1.00)\naanod (0.02)\naoiul (0.01)\n729 (1.00)\n729 (1.00)\na151 (0.02)\nPL W,t0 (0.06)\n35h24'345-p (0.11)\n737 (0.99)\n737 (1.00)\nBLE 26,745 - (0.65)\n91e 76,145 (0.04)\n703 (1.00)\n703 (1.00)\nL/00,10 (0.42)\n730 (1.00)\nLioo,I0 (0.27)\n730 (1.00)\nBLE 6,20 - (0.27)\n49 (0.75)\nBLE 6,236 (0.39)\n'411 (0.28)\n2 (0.39)\n393 - (0.08)\n38 (0.15)\n[i (0.28)\n101 (0.66)\n729 (0.86)\n70? (0.18)\n\"ua (0.04)\n4 (0.70)\n729 (1.00)\nFeosa (0.00)\n740 (0.99)\n6Ea1s (0.03)\nA rr (0.00)\n730 (1.00)\n730 (1.00)\n729 (1.00)\n729 (1.00)\n1ise})6 (0.02)\n6E155936- (0.13)\nBL70150 (0.16)\n786150 (0.13)\n26280126 (0.01)\n~DL (0.08)\n713 (1.00)\nI5Du5 (0.04)\nHzT,bo (0.09)\nSshz4x3k5 R (0.04)\n729 (1.00)\n704 (0.94)\n729 (1.00)\n9haiso (0.01)\n1v (0.02)\non (0.35)\n704 (0.49)\n1ek (0.18)\n729 (1.00)\n729 (1.00)\n7ogisn (0.26)\nIL 26,i50 (0.16)\n5512,1l5-8 (0.05)\n730 (0.98)\n711 (0.99)",
+      "ai": null
+    },
+    {
+      "index": 1,
+      "bbox_px": {
+        "x": 1060,
+        "y": 0,
+        "w": 416,
+        "h": 730
+      },
+      "ocr_excerpt": "139 (0.27)\n36ai (0.04)\n713 (1.00)\n741 (0.81)\nsa (0.01)\nSchnit30 P-B (0.04)\n4 (0.14)\n2 (0.85)\n41 (0.20)\n0ao (0.03)\n742 (0.92)\nJLln (0.14)\n739 (1.00)\nH2D,55 (0.29)\n12 2n7- (0.07)\n7 (0.37)\n2 (0.18)\n743 (0.99)\nArs (0.07)\nhon (0.02)\n723 (0.87)\n741 (1.00)\n713 (1.00)\n739 (1.00)\nELE 6,16* (0.11)\nELlzuuli (0.06)\nLb0,is (0.04)\nFoh (0.01)",
+      "ai": null
+    },
+    {
+      "index": 2,
+      "bbox_px": {
+        "x": 1015,
+        "y": 753,
+        "w": 451,
+        "h": 452
+      },
+      "ocr_excerpt": "Ansicht (0.55)",
+      "ai": null
+    },
+    {
+      "index": 3,
+      "bbox_px": {
+        "x": 432,
+        "y": 884,
+        "w": 264,
+        "h": 235
+      },
+      "ocr_excerpt": "",
+      "ai": null
+    },
+    {
+      "index": 4,
+      "bbox_px": {
+        "x": 89,
+        "y": 926,
+        "w": 168,
+        "h": 173
+      },
+      "ocr_excerpt": "731 (0.33)\n702 (0.86)\n131 (0.77)\n128 (0.36)\n707 (1.00)",
+      "ai": null
+    },
+    {
+      "index": 5,
+      "bbox_px": {
+        "x": 430,
+        "y": 1019,
+        "w": 133,
+        "h": 133
+      },
+      "ocr_excerpt": "[ (0.07)\nYoz (0.06)",
+      "ai": null
+    }
+  ],
+  "outputs": {
+    "composite_png": "C:\\Users\\admin\\Desktop\\HyzenInterview\\out_sheet\\Sample_composite_layout.png",
+    "panels_glob": "Sample_panel_*.png"
+  },
+  "warnings": [
+    "Panel 0: AI skipped/failed: RuntimeError: Gemini HTTP 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\\nPlease retry in 8.388935851s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerMinutePerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count\",\n            \"quotaId\": \"GenerateContentInputTokensPerModelPerMinute-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"8s\"\n      }\n    ]\n  }\n}\n",
+    "Panel 1: AI skipped/failed: RuntimeError: Gemini HTTP 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\nPlease retry in 4.497144057s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count\",\n            \"quotaId\": \"GenerateContentInputTokensPerModelPerMinute-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerMinutePerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"4s\"\n      }\n    ]\n  }\n}\n",
+    "Panel 2: AI skipped/failed: RuntimeError: Gemini HTTP 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\\nPlease retry in 2.02395725s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"model\": \"gemini-2.0-flash\",\n              \"location\": \"global\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerMinutePerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count\",\n            \"quotaId\": \"GenerateContentInputTokensPerModelPerMinute-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"2s\"\n      }\n    ]\n  }\n}\n",
+    "Panel 3: AI skipped/failed: RuntimeError: Gemini HTTP 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\\nPlease retry in 59.85398593s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"model\": \"gemini-2.0-flash\",\n              \"location\": \"global\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerMinutePerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count\",\n            \"quotaId\": \"GenerateContentInputTokensPerModelPerMinute-FreeTier\",\n            \"quotaDimensions\": {\n              \"model\": \"gemini-2.0-flash\",\n              \"location\": \"global\"\n            }\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"59s\"\n      }\n    ]\n  }\n}\n",
+    "Panel 4: AI skipped/failed: RuntimeError: Gemini HTTP 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\nPlease retry in 57.685519008s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count\",\n            \"quotaId\": \"GenerateContentInputTokensPerModelPerMinute-FreeTier\",\n            \"quotaDimensions\": {\n              \"model\": \"gemini-2.0-flash\",\n              \"location\": \"global\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerMinutePerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"57s\"\n      }\n    ]\n  }\n}\n",
+    "Panel 5: AI skipped/failed: RuntimeError: Gemini HTTP 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\\nPlease retry in 55.590535187s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count\",\n            \"quotaId\": \"GenerateContentInputTokensPerModelPerMinute-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerMinutePerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          },\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.0-flash\"\n            }\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"55s\"\n      }\n    ]\n  }\n}\n"
+  ]
+}
